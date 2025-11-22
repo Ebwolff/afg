@@ -1,0 +1,584 @@
+import { useEffect, useRef, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Slider } from "@/components/ui/slider";
+import { Download, Plus, Trash2, Image as ImageIcon, Type } from "lucide-react";
+import { BannerConfig } from "../types";
+
+interface ImageLayer {
+    id: string;
+    src: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    rotation: number;
+    brightness: number;
+    contrast: number;
+}
+
+interface TextLayer {
+    id: string;
+    text: string;
+    x: number;
+    y: number;
+    fontSize: number;
+    color: string;
+    font: string;
+}
+
+interface BannerEditorProps {
+    image: string;
+    onSave: (config: BannerConfig, canvas: HTMLCanvasElement) => void;
+    onCancel: () => void;
+}
+
+export function BannerEditor({ image, onSave, onCancel }: BannerEditorProps) {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Camadas de imagens e textos
+    const [imageLayers, setImageLayers] = useState<ImageLayer[]>([
+        {
+            id: "base",
+            src: image,
+            x: 0,
+            y: 0,
+            width: 100,
+            height: 100,
+            rotation: 0,
+            brightness: 100,
+            contrast: 100,
+        },
+    ]);
+    const [textLayers, setTextLayers] = useState<TextLayer[]>([]);
+
+    // Camada selecionada
+    const [selectedImageLayer, setSelectedImageLayer] = useState<string | null>("base");
+    const [selectedTextLayer, setSelectedTextLayer] = useState<string | null>(null);
+
+    // Dimensões do canvas
+    const [canvasWidth, setCanvasWidth] = useState(800);
+    const [canvasHeight, setCanvasHeight] = useState(600);
+
+    // Formato de exportação
+    const [exportFormat, setExportFormat] = useState<"png" | "jpeg">("png");
+
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
+        canvas.width = canvasWidth;
+        canvas.height = canvasHeight;
+
+        // Call async function properly
+        void drawCanvas(ctx);
+    }, [imageLayers, textLayers, canvasWidth, canvasHeight]);
+
+    const drawCanvas = async (ctx: CanvasRenderingContext2D) => {
+        const canvas = ctx.canvas;
+
+        // Limpar canvas
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Desenhar todas as camadas de imagem sequencialmente
+        for (const layer of imageLayers) {
+            await drawImageLayer(ctx, layer);
+        }
+
+        // Desenhar todas as camadas de texto
+        for (const layer of textLayers) {
+            drawTextLayer(ctx, layer);
+        }
+    };
+
+    const drawImageLayer = (ctx: CanvasRenderingContext2D, layer: ImageLayer): Promise<void> => {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.onload = () => {
+                const canvas = ctx.canvas;
+                ctx.save();
+
+                // Calcular posição e tamanho em pixels
+                const x = (canvas.width * layer.x) / 100;
+                const y = (canvas.height * layer.y) / 100;
+                const width = (canvas.width * layer.width) / 100;
+                const height = (canvas.height * layer.height) / 100;
+
+                // Aplicar transformações
+                ctx.translate(x + width / 2, y + height / 2);
+                ctx.rotate((layer.rotation * Math.PI) / 180);
+                ctx.translate(-(x + width / 2), -(y + height / 2));
+
+                // Aplicar filtros
+                ctx.filter = `brightness(${layer.brightness}%) contrast(${layer.contrast}%)`;
+
+                // Desenhar imagem
+                ctx.drawImage(img, x, y, width, height);
+
+                ctx.restore();
+                resolve();
+            };
+            img.onerror = () => resolve();
+            img.src = layer.src;
+        });
+    };
+
+    const drawTextLayer = (ctx: CanvasRenderingContext2D, layer: TextLayer) => {
+        const canvas = ctx.canvas;
+        ctx.save();
+
+        ctx.font = `${layer.fontSize}px ${layer.font}`;
+        ctx.fillStyle = layer.color;
+        ctx.textAlign = "center";
+        ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+        ctx.shadowBlur = 4;
+        ctx.shadowOffsetX = 2;
+        ctx.shadowOffsetY = 2;
+
+        const x = (canvas.width * layer.x) / 100;
+        const y = (canvas.height * layer.y) / 100;
+
+        ctx.fillText(layer.text, x, y);
+
+        ctx.restore();
+    };
+
+    const handleAddImage = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const newLayer: ImageLayer = {
+                id: crypto.randomUUID(),
+                src: event.target?.result as string,
+                x: 25,
+                y: 25,
+                width: 50,
+                height: 50,
+                rotation: 0,
+                brightness: 100,
+                contrast: 100,
+            };
+            setImageLayers([...imageLayers, newLayer]);
+            setSelectedImageLayer(newLayer.id);
+            setSelectedTextLayer(null);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const handleAddText = () => {
+        const newLayer: TextLayer = {
+            id: crypto.randomUUID(),
+            text: "Novo Texto",
+            x: 50,
+            y: 50,
+            fontSize: 32,
+            color: "#ffffff",
+            font: "Arial",
+        };
+        setTextLayers([...textLayers, newLayer]);
+        setSelectedTextLayer(newLayer.id);
+        setSelectedImageLayer(null);
+    };
+
+    const updateImageLayer = (id: string, updates: Partial<ImageLayer>) => {
+        setImageLayers(imageLayers.map(layer =>
+            layer.id === id ? { ...layer, ...updates } : layer
+        ));
+    };
+
+    const updateTextLayer = (id: string, updates: Partial<TextLayer>) => {
+        setTextLayers(textLayers.map(layer =>
+            layer.id === id ? { ...layer, ...updates } : layer
+        ));
+    };
+
+    const deleteImageLayer = (id: string) => {
+        if (id === "base") return; // Não permitir deletar imagem base
+        setImageLayers(imageLayers.filter(layer => layer.id !== id));
+        setSelectedImageLayer(null);
+    };
+
+    const deleteTextLayer = (id: string) => {
+        setTextLayers(textLayers.filter(layer => layer.id !== id));
+        setSelectedTextLayer(null);
+    };
+
+    const handleSave = () => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        const config: BannerConfig = {
+            largura: canvas.width,
+            altura: canvas.height,
+            texto_posicao: { x: 50, y: 50 },
+            texto_cor: "#ffffff",
+            texto_tamanho: 32,
+            texto_fonte: "Arial",
+            filtros: [],
+        };
+
+        onSave(config, canvas);
+    };
+
+    const handleDownload = () => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        const mimeType = exportFormat === "png" ? "image/png" : "image/jpeg";
+        const extension = exportFormat === "png" ? "png" : "jpg";
+        const filename = `banner-${Date.now()}.${extension}`;
+
+        // Usar toDataURL para garantir compatibilidade do nome do arquivo
+        const dataUrl = canvas.toDataURL(mimeType, 0.95);
+
+        const link = document.createElement("a");
+        link.download = filename;
+        link.href = dataUrl;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const selectedImage = imageLayers.find(l => l.id === selectedImageLayer);
+    const selectedText = textLayers.find(l => l.id === selectedTextLayer);
+
+    return (
+        <div className="grid gap-6 lg:grid-cols-2">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Preview do Banner</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="border rounded-lg overflow-hidden bg-muted">
+                        <canvas ref={canvasRef} className="w-full h-auto" />
+                    </div>
+                    <div className="flex gap-2 mt-4">
+                        <Button onClick={handleDownload} variant="outline" size="sm">
+                            <Download className="h-4 w-4 mr-2" />
+                            Download
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <div className="space-y-4">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Dimensões do Canvas</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>Largura (px)</Label>
+                                <Input
+                                    type="number"
+                                    value={canvasWidth}
+                                    onChange={(e) => setCanvasWidth(Number(e.target.value))}
+                                    min={100}
+                                    max={2000}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Altura (px)</Label>
+                                <Input
+                                    type="number"
+                                    value={canvasHeight}
+                                    onChange={(e) => setCanvasHeight(Number(e.target.value))}
+                                    min={100}
+                                    max={2000}
+                                />
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Formato de Exportação</Label>
+                            <select
+                                value={exportFormat}
+                                onChange={(e) => setExportFormat(e.target.value as "png" | "jpeg")}
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                <option value="png">PNG (com transparência)</option>
+                                <option value="jpeg">JPEG (menor tamanho)</option>
+                            </select>
+                            <p className="text-xs text-muted-foreground">
+                                {exportFormat === "png"
+                                    ? "PNG mantém transparência e melhor qualidade"
+                                    : "JPEG gera arquivos menores, ideal para fotos"}
+                            </p>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Camadas</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                        <div className="flex gap-2">
+                            <Button onClick={() => fileInputRef.current?.click()} size="sm" className="flex-1">
+                                <ImageIcon className="h-4 w-4 mr-2" />
+                                Adicionar Imagem
+                            </Button>
+                            <Button onClick={handleAddText} size="sm" className="flex-1">
+                                <Type className="h-4 w-4 mr-2" />
+                                Adicionar Texto
+                            </Button>
+                        </div>
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleAddImage}
+                            className="hidden"
+                        />
+
+                        <div className="space-y-1 mt-4">
+                            <Label className="text-xs text-muted-foreground">Imagens ({imageLayers.length})</Label>
+                            {imageLayers.map((layer, index) => (
+                                <div
+                                    key={layer.id}
+                                    className={`flex items-center gap-2 p-2 rounded border cursor-pointer ${selectedImageLayer === layer.id ? "bg-accent" : ""
+                                        }`}
+                                    onClick={() => {
+                                        setSelectedImageLayer(layer.id);
+                                        setSelectedTextLayer(null);
+                                    }}
+                                >
+                                    <ImageIcon className="h-4 w-4" />
+                                    <span className="flex-1 text-sm">
+                                        {layer.id === "base" ? "Imagem Base" : `Imagem ${index}`}
+                                    </span>
+                                    {layer.id !== "base" && (
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                deleteImageLayer(layer.id);
+                                            }}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="space-y-1 mt-4">
+                            <Label className="text-xs text-muted-foreground">Textos ({textLayers.length})</Label>
+                            {textLayers.map((layer, index) => (
+                                <div
+                                    key={layer.id}
+                                    className={`flex items-center gap-2 p-2 rounded border cursor-pointer ${selectedTextLayer === layer.id ? "bg-accent" : ""
+                                        }`}
+                                    onClick={() => {
+                                        setSelectedTextLayer(layer.id);
+                                        setSelectedImageLayer(null);
+                                    }}
+                                >
+                                    <Type className="h-4 w-4" />
+                                    <span className="flex-1 text-sm truncate">
+                                        {layer.text || `Texto ${index + 1}`}
+                                    </span>
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            deleteTextLayer(layer.id);
+                                        }}
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {selectedImage && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Editar Imagem</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label>Posição X (%)</Label>
+                                    <Slider
+                                        value={[selectedImage.x]}
+                                        onValueChange={([x]) => updateImageLayer(selectedImage.id, { x })}
+                                        max={100}
+                                        step={1}
+                                    />
+                                    <span className="text-xs text-muted-foreground">{selectedImage.x}%</span>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Posição Y (%)</Label>
+                                    <Slider
+                                        value={[selectedImage.y]}
+                                        onValueChange={([y]) => updateImageLayer(selectedImage.id, { y })}
+                                        max={100}
+                                        step={1}
+                                    />
+                                    <span className="text-xs text-muted-foreground">{selectedImage.y}%</span>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label>Largura (%)</Label>
+                                    <Slider
+                                        value={[selectedImage.width]}
+                                        onValueChange={([width]) => updateImageLayer(selectedImage.id, { width })}
+                                        min={10}
+                                        max={100}
+                                        step={1}
+                                    />
+                                    <span className="text-xs text-muted-foreground">{selectedImage.width}%</span>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Altura (%)</Label>
+                                    <Slider
+                                        value={[selectedImage.height]}
+                                        onValueChange={([height]) => updateImageLayer(selectedImage.id, { height })}
+                                        min={10}
+                                        max={100}
+                                        step={1}
+                                    />
+                                    <span className="text-xs text-muted-foreground">{selectedImage.height}%</span>
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Rotação (°)</Label>
+                                <Slider
+                                    value={[selectedImage.rotation]}
+                                    onValueChange={([rotation]) => updateImageLayer(selectedImage.id, { rotation })}
+                                    min={0}
+                                    max={360}
+                                    step={1}
+                                />
+                                <span className="text-xs text-muted-foreground">{selectedImage.rotation}°</span>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Brilho</Label>
+                                <Slider
+                                    value={[selectedImage.brightness]}
+                                    onValueChange={([brightness]) => updateImageLayer(selectedImage.id, { brightness })}
+                                    min={0}
+                                    max={200}
+                                    step={1}
+                                />
+                                <span className="text-xs text-muted-foreground">{selectedImage.brightness}%</span>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Contraste</Label>
+                                <Slider
+                                    value={[selectedImage.contrast]}
+                                    onValueChange={([contrast]) => updateImageLayer(selectedImage.id, { contrast })}
+                                    min={0}
+                                    max={200}
+                                    step={1}
+                                />
+                                <span className="text-xs text-muted-foreground">{selectedImage.contrast}%</span>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {selectedText && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Editar Texto</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="space-y-2">
+                                <Label>Texto</Label>
+                                <Textarea
+                                    value={selectedText.text}
+                                    onChange={(e) => updateTextLayer(selectedText.id, { text: e.target.value })}
+                                    rows={3}
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label>Posição X (%)</Label>
+                                    <Slider
+                                        value={[selectedText.x]}
+                                        onValueChange={([x]) => updateTextLayer(selectedText.id, { x })}
+                                        max={100}
+                                        step={1}
+                                    />
+                                    <span className="text-xs text-muted-foreground">{selectedText.x}%</span>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Posição Y (%)</Label>
+                                    <Slider
+                                        value={[selectedText.y]}
+                                        onValueChange={([y]) => updateTextLayer(selectedText.id, { y })}
+                                        max={100}
+                                        step={1}
+                                    />
+                                    <span className="text-xs text-muted-foreground">{selectedText.y}%</span>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label>Cor</Label>
+                                    <Input
+                                        type="color"
+                                        value={selectedText.color}
+                                        onChange={(e) => updateTextLayer(selectedText.id, { color: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Tamanho</Label>
+                                    <Input
+                                        type="number"
+                                        value={selectedText.fontSize}
+                                        onChange={(e) => updateTextLayer(selectedText.id, { fontSize: Number(e.target.value) })}
+                                        min={12}
+                                        max={120}
+                                    />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Fonte</Label>
+                                <select
+                                    value={selectedText.font}
+                                    onChange={(e) => updateTextLayer(selectedText.id, { font: e.target.value })}
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    <option value="Arial">Arial</option>
+                                    <option value="Helvetica">Helvetica</option>
+                                    <option value="Times New Roman">Times New Roman</option>
+                                    <option value="Georgia">Georgia</option>
+                                    <option value="Verdana">Verdana</option>
+                                    <option value="Courier New">Courier New</option>
+                                </select>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                <div className="flex gap-2">
+                    <Button onClick={handleSave} className="flex-1">
+                        Salvar Banner
+                    </Button>
+                    <Button onClick={onCancel} variant="outline">
+                        Cancelar
+                    </Button>
+                </div>
+            </div>
+        </div>
+    );
+}

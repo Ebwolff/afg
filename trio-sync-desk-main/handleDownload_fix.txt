@@ -1,0 +1,23 @@
+﻿const handleDownload = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const mimeType = exportFormat === "png" ? "image/png" : "image/jpeg";
+    const extension = exportFormat === "png" ? "png" : "jpg";
+    const filename = `banner-${Date.now()}.`;
+    
+    canvas.toBlob((blob) => {
+        if (!blob) return;
+        
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("download", filename);
+        link.setAttribute("href", url);
+        link.style.display = "none";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        setTimeout(() => URL.revokeObjectURL(url), 100);
+    }, mimeType, 0.95);
+};
