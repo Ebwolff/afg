@@ -11,7 +11,7 @@ import { BannerConfig } from "@/features/banners/types";
 export default function Banners() {
     const { banners, createMutation, deleteMutation } = useBanners();
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
-    const [imageFile, setImageFile] = useState<File | null>(null);
+    const [, setImageFile] = useState<File | null>(null);
     const [activeTab, setActiveTab] = useState("criar");
 
     const handleImageSelect = (file: File) => {

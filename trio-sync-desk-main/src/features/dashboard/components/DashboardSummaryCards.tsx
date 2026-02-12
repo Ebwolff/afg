@@ -27,11 +27,11 @@ export function DashboardSummaryCards({
                         <Skeleton className="h-8 w-24" />
                     ) : (
                         <div className="text-2xl font-bold text-primary">
-                            R$ {saldo.saldo.toFixed(2)}
+                            {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(saldo.saldo)}
                         </div>
                     )}
                     <p className="text-xs text-muted-foreground">
-                        {saldo.entradas > 0 && `+R$ ${saldo.entradas.toFixed(2)} entradas`}
+                        {saldo.entradas > 0 && `+${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(saldo.entradas)} entradas`}
                     </p>
                 </CardContent>
             </Card>
@@ -46,7 +46,7 @@ export function DashboardSummaryCards({
                         <Skeleton className="h-8 w-24" />
                     ) : (
                         <div className="text-2xl font-bold text-destructive">
-                            R$ {saldo.saidas.toFixed(2)}
+                            {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(saldo.saidas)}
                         </div>
                     )}
                     <p className="text-xs text-muted-foreground">Total de saídas</p>

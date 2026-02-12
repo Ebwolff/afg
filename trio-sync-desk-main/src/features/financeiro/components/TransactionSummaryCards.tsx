@@ -14,26 +14,28 @@ export function TransactionSummaryCards({ transacoes, isLoading, type }: Transac
         if (!transacoes) return { total: 0, vencidas: 0, pagas: 0, aVencer7Dias: 0 };
 
         const hoje = new Date();
-        const em7Dias = new Date();
+        hoje.setHours(0, 0, 0, 0);
+        const em7Dias = new Date(hoje);
         em7Dias.setDate(hoje.getDate() + 7);
 
         return transacoes.reduce(
             (acc, t) => {
                 const vencimento = t.data_vencimento ? new Date(t.data_vencimento) : null;
+                if (vencimento) vencimento.setHours(0, 0, 0, 0);
 
                 if (t.status === "pendente") {
-                    acc.total += t.valor;
+                    acc.total += Number(t.valor || 0);
                     if (vencimento && vencimento < hoje) {
-                        acc.vencidas += t.valor;
+                        acc.vencidas += Number(t.valor || 0);
                     }
                     if (vencimento && vencimento <= em7Dias && vencimento >= hoje) {
-                        acc.aVencer7Dias += t.valor;
+                        acc.aVencer7Dias += Number(t.valor || 0);
                     }
                 }
                 if (t.status === "pago") {
                     const pagamento = t.data_pagamento ? new Date(t.data_pagamento) : null;
-                    if (pagamento && pagamento.getMonth() === hoje.getMonth() && pagamento.getFullYear() === hoje.getFullYear()) {
-                        acc.pagas += t.valor;
+                    if (pagamento && !isNaN(pagamento.getTime()) && pagamento.getMonth() === hoje.getMonth() && pagamento.getFullYear() === hoje.getFullYear()) {
+                        acc.pagas += Number(t.valor || 0);
                     }
                 }
                 return acc;
@@ -66,7 +68,7 @@ export function TransactionSummaryCards({ transacoes, isLoading, type }: Transac
                 </CardHeader>
                 <CardContent>
                     <div className="text-2xl font-bold">
-                        {isLoading ? <Skeleton className="h-8 w-32" /> : `R$ ${resumo.total.toFixed(2)}`}
+                        {isLoading ? <Skeleton className="h-8 w-32" /> : new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(resumo.total)}
                     </div>
                     <p className="text-xs text-muted-foreground">{subtitles.total}</p>
                 </CardContent>
@@ -81,7 +83,7 @@ export function TransactionSummaryCards({ transacoes, isLoading, type }: Transac
                 </CardHeader>
                 <CardContent>
                     <div className="text-2xl font-bold text-destructive">
-                        {isLoading ? <Skeleton className="h-8 w-32" /> : `R$ ${resumo.vencidas.toFixed(2)}`}
+                        {isLoading ? <Skeleton className="h-8 w-32" /> : new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(resumo.vencidas)}
                     </div>
                     <p className="text-xs text-muted-foreground">{subtitles.vencidas}</p>
                 </CardContent>
@@ -93,7 +95,7 @@ export function TransactionSummaryCards({ transacoes, isLoading, type }: Transac
                 </CardHeader>
                 <CardContent>
                     <div className="text-2xl font-bold">
-                        {isLoading ? <Skeleton className="h-8 w-32" /> : `R$ ${resumo.pagas.toFixed(2)}`}
+                        {isLoading ? <Skeleton className="h-8 w-32" /> : new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(resumo.pagas)}
                     </div>
                     <p className="text-xs text-muted-foreground">{subtitles.pagas}</p>
                 </CardContent>
@@ -105,7 +107,7 @@ export function TransactionSummaryCards({ transacoes, isLoading, type }: Transac
                 </CardHeader>
                 <CardContent>
                     <div className={`text-2xl font-bold ${type === "receita" ? "text-green-600" : "text-orange-600"}`}>
-                        {isLoading ? <Skeleton className="h-8 w-32" /> : `R$ ${resumo.aVencer7Dias.toFixed(2)}`}
+                        {isLoading ? <Skeleton className="h-8 w-32" /> : new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(resumo.aVencer7Dias)}
                     </div>
                     <p className="text-xs text-muted-foreground">{subtitles.previsao}</p>
                 </CardContent>

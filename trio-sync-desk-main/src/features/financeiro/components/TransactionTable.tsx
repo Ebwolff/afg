@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Check, X, Trash2 } from "lucide-react";
+import { Check, X, Trash2, Pencil } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Transacao } from "../types";
@@ -14,9 +14,10 @@ interface TransactionTableProps {
     onRegistrarPagamento: (transacao: Transacao) => void;
     onCancelar: (transacao: Transacao) => void;
     onDelete: (id: string) => void;
+    onEdit: (transacao: Transacao) => void;
 }
 
-export function TransactionTable({ transacoes, isLoading, onRegistrarPagamento, onCancelar, onDelete }: TransactionTableProps) {
+export function TransactionTable({ transacoes, isLoading, onRegistrarPagamento, onCancelar, onDelete, onEdit }: TransactionTableProps) {
     const getStatusBadge = (status: string) => {
         const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
             pendente: "secondary",
@@ -62,13 +63,17 @@ export function TransactionTable({ transacoes, isLoading, onRegistrarPagamento, 
                 {transacoes.map((transacao) => (
                     <TableRow key={transacao.id}>
                         <TableCell>
-                            {transacao.data_vencimento
-                                ? format(new Date(transacao.data_vencimento), "dd/MM/yyyy", { locale: ptBR })
-                                : "-"}
+                            {(() => {
+                                if (!transacao.data_vencimento) return "-";
+                                const date = new Date(transacao.data_vencimento);
+                                return isNaN(date.getTime()) ? "Data Inválida" : format(date, "dd/MM/yyyy", { locale: ptBR });
+                            })()}
                         </TableCell>
                         <TableCell>{transacao.fornecedor_cliente || "-"}</TableCell>
                         <TableCell>{transacao.descricao}</TableCell>
-                        <TableCell>R$ {transacao.valor.toFixed(2)}</TableCell>
+                        <TableCell>
+                            {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(transacao.valor || 0))}
+                        </TableCell>
                         <TableCell>{getStatusBadge(transacao.status)}</TableCell>
                         <TableCell>
                             {transacao.parcela_numero && transacao.parcela_total
@@ -77,6 +82,13 @@ export function TransactionTable({ transacoes, isLoading, onRegistrarPagamento, 
                         </TableCell>
                         <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => onEdit(transacao)}
+                                >
+                                    <Pencil className="h-4 w-4" />
+                                </Button>
                                 {transacao.status === "pendente" && (
                                     <Button
                                         variant="outline"

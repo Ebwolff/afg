@@ -3,15 +3,15 @@ import { useProdutos } from "@/features/produtos/hooks/useProdutos";
 import { ProdutoFormDialog } from "@/features/produtos/components/ProdutoFormDialog";
 import { ProdutoList } from "@/features/produtos/components/ProdutoList";
 
+import { ProductSkeleton } from "@/components/skeletons/ProductSkeleton";
+
 export default function Produtos() {
   const { produtos, isLoading, createMutation, deleteMutation } = useProdutos();
 
   if (isLoading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">Carregando...</p>
-        </div>
+        <ProductSkeleton />
       </Layout>
     );
   }

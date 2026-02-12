@@ -1,11 +1,12 @@
 import { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { LayoutDashboard, Users, UserCircle, Package, Calendar, DollarSign, LogOut, Calculator, FileText, ArrowDownCircle, ArrowUpCircle, Image } from "lucide-react";
+import { LayoutDashboard, Users, UserCircle, Package, Calendar, DollarSign, LogOut, Calculator, FileText, ArrowDownCircle, ArrowUpCircle, Image, CheckSquare } from "lucide-react";
 import { Button } from "./ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { NavLink } from "./NavLink";
 import logo from "@/assets/logo.jpg";
+import { NotificationPopover } from "@/features/notifications/components/NotificationPopover";
 
 interface LayoutProps {
   children: ReactNode;
@@ -38,6 +39,9 @@ export function Layout({ children }: LayoutProps) {
           <nav className="flex-1 space-y-1 p-4">
             <NavLink to="/dashboard" icon={LayoutDashboard}>
               Dashboard
+            </NavLink>
+            <NavLink to="/tasks" icon={CheckSquare}>
+              Tarefas
             </NavLink>
             <NavLink to="/atendimentos" icon={Users}>
               Atendimentos
@@ -83,6 +87,9 @@ export function Layout({ children }: LayoutProps) {
         </div>
       </aside>
       <main className="ml-64">
+        <div className="flex justify-end items-center px-8 py-4 border-b bg-white">
+          <NotificationPopover />
+        </div>
         <div className="container mx-auto p-8">{children}</div>
       </main>
     </div>

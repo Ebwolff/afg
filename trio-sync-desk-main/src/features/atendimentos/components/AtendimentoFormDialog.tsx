@@ -18,7 +18,21 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Plus } from "lucide-react";
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from "@/components/ui/command";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
+import { Plus, Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { AtendimentoFormData } from "../types";
 import { useClientes } from "@/features/clientes/hooks/useClientes";
 
@@ -29,6 +43,7 @@ interface AtendimentoFormDialogProps {
 
 export function AtendimentoFormDialog({ onSubmit, isLoading }: AtendimentoFormDialogProps) {
     const [open, setOpen] = useState(false);
+    const [comboboxOpen, setComboboxOpen] = useState(false);
     const { clientes } = useClientes();
     const [formData, setFormData] = useState<AtendimentoFormData>({
         cliente_id: "",
@@ -38,27 +53,26 @@ export function AtendimentoFormDialog({ onSubmit, isLoading }: AtendimentoFormDi
         descricao: "",
     });
 
-    // Quando selecionar um cliente, preencher automaticamente nome e contato
-    const handleClienteChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const clienteId = e.target.value;
-        const cliente = clientes?.find(c => c.id === clienteId);
-
-        if (cliente) {
-            setFormData({
-                ...formData,
-                cliente_id: clienteId,
-                cliente_nome: cliente.nome,
-                cliente_contato: cliente.telefone || cliente.email || "",
-            });
-        } else {
-            // "novo" - limpar campos para permitir digitação manual
+    const handleClienteSelect = (clienteId: string) => {
+        if (clienteId === "novo") {
             setFormData({
                 ...formData,
                 cliente_id: "",
                 cliente_nome: "",
                 cliente_contato: "",
             });
+        } else {
+            const cliente = clientes?.find(c => c.id === clienteId);
+            if (cliente) {
+                setFormData({
+                    ...formData,
+                    cliente_id: clienteId,
+                    cliente_nome: cliente.nome,
+                    cliente_contato: cliente.telefone || cliente.email || "",
+                });
+            }
         }
+        setComboboxOpen(false);
     };
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -90,21 +104,61 @@ export function AtendimentoFormDialog({ onSubmit, isLoading }: AtendimentoFormDi
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="cliente_select">Cliente</Label>
-                        <select
-                            id="cliente_select"
-                            value={formData.cliente_id || "novo"}
-                            onChange={handleClienteChange}
-                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            <option value="novo">+ Novo Cliente (digitar manualmente)</option>
-                            {clientes?.map((cliente) => (
-                                <option key={cliente.id} value={cliente.id}>
-                                    {cliente.nome} - {cliente.telefone || cliente.email}
-                                </option>
-                            ))}
-                        </select>
+                    <div className="space-y-2 flex flex-col">
+                        <Label>Cliente</Label>
+                        <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    aria-expanded={comboboxOpen}
+                                    className="w-full justify-between"
+                                >
+                                    {formData.cliente_id
+                                        ? clientes?.find((c) => c.id === formData.cliente_id)?.nome
+                                        : "Selecione um cliente..."}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[400px] p-0">
+                                <Command>
+                                    <CommandInput placeholder="Buscar cliente..." />
+                                    <CommandList>
+                                        <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
+                                        <CommandGroup>
+                                            <CommandItem
+                                                value="novo_cliente_manual"
+                                                onSelect={() => handleClienteSelect("novo")}
+                                                className="text-primary font-medium"
+                                            >
+                                                <Check
+                                                    className={cn(
+                                                        "mr-2 h-4 w-4",
+                                                        !formData.cliente_id ? "opacity-100" : "opacity-0"
+                                                    )}
+                                                />
+                                                + Novo Cliente (digitar manualmente)
+                                            </CommandItem>
+                                            {clientes?.map((cliente) => (
+                                                <CommandItem
+                                                    key={cliente.id}
+                                                    value={cliente.nome}
+                                                    onSelect={() => handleClienteSelect(cliente.id)}
+                                                >
+                                                    <Check
+                                                        className={cn(
+                                                            "mr-2 h-4 w-4",
+                                                            formData.cliente_id === cliente.id ? "opacity-100" : "opacity-0"
+                                                        )}
+                                                    />
+                                                    {cliente.nome}
+                                                </CommandItem>
+                                            ))}
+                                        </CommandGroup>
+                                    </CommandList>
+                                </Command>
+                            </PopoverContent>
+                        </Popover>
                     </div>
 
                     <div className="space-y-2">

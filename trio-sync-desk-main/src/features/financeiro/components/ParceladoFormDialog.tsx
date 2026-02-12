@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -12,8 +13,29 @@ import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { ParceladoFormData } from "../types";
 
+const CATEGORIAS_RECEITA = [
+    "Vendas",
+    "Serviços",
+    "Comissões",
+    "Rendimentos",
+    "Outros"
+];
+
+const CATEGORIAS_DESPESA = [
+    "Aluguel",
+    "Água/Luz/Internet",
+    "Fornecedores",
+    "Salários",
+    "Impostos",
+    "Marketing",
+    "Manutenção",
+    "Alimentação",
+    "Transporte",
+    "Outros"
+];
+
 interface ParceladoFormDialogProps {
-    onSubmit: (data: ParceladoFormData) => void;
+    onSubmit: (data: ParceladoFormData & { type: "receita" | "despesa" }) => void;
     isLoading: boolean;
     type: "receita" | "despesa";
 }
@@ -34,7 +56,7 @@ export function ParceladoFormDialog({ onSubmit, isLoading, type }: ParceladoForm
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onSubmit(formData);
+        onSubmit({ ...formData, type });
         setOpen(false);
         setFormData({
             descricao: "",
@@ -48,6 +70,8 @@ export function ParceladoFormDialog({ onSubmit, isLoading, type }: ParceladoForm
             observacoes: "",
         });
     };
+
+    const categorias = type === "receita" ? CATEGORIAS_RECEITA : CATEGORIAS_DESPESA;
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
@@ -128,11 +152,18 @@ export function ParceladoFormDialog({ onSubmit, isLoading, type }: ParceladoForm
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="categoria-p">Categoria</Label>
-                                <Input
-                                    id="categoria-p"
-                                    value={formData.categoria}
-                                    onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
-                                />
+                                <Select value={formData.categoria} onValueChange={(value) => setFormData({ ...formData, categoria: value })}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Selecione" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {categorias.map((cat) => (
+                                            <SelectItem key={cat} value={cat}>
+                                                {cat}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </div>
                         <div className="grid gap-2">

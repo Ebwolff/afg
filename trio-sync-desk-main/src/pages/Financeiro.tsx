@@ -18,11 +18,35 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useOfflineMutation } from "@/hooks/useOfflineMutation";
+import { createTransaction, deleteTransaction } from "@/features/financeiro/api/transactions";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { TransactionSkeleton } from "@/components/skeletons/TransactionSkeleton";
+
+const CATEGORIAS_RECEITA = [
+  "Vendas",
+  "Serviços",
+  "Comissões",
+  "Rendimentos",
+  "Outros"
+];
+
+const CATEGORIAS_DESPESA = [
+  "Aluguel",
+  "Água/Luz/Internet",
+  "Fornecedores",
+  "Salários",
+  "Impostos",
+  "Marketing",
+  "Manutenção",
+  "Alimentação",
+  "Transporte",
+  "Outros"
+];
 
 export default function Financeiro() {
   const [open, setOpen] = useState(false);
@@ -30,13 +54,15 @@ export default function Financeiro() {
   const queryClient = useQueryClient();
 
   const [formData, setFormData] = useState({
-    tipo: "entrada" as "entrada" | "saida",
+    tipo: "receita" as "receita" | "despesa",
     descricao: "",
     valor: "",
     categoria: "",
   });
 
-  const { data: transacoes } = useQuery({
+  const categorias = formData.tipo === "receita" ? CATEGORIAS_RECEITA : CATEGORIAS_DESPESA;
+
+  const { data: transacoes, isLoading } = useQuery({
     queryKey: ["transacoes"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -48,30 +74,26 @@ export default function Financeiro() {
     },
   });
 
-  const createMutation = useMutation({
-    mutationFn: async (values: typeof formData) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuário não autenticado");
-
-      const { error } = await supabase.from("transacoes").insert({
-        tipo: values.tipo,
-        descricao: values.descricao,
-        valor: Number(values.valor),
-        categoria: values.categoria,
-        created_by: user.id,
-      });
-      if (error) throw error;
-    },
+  const createMutation = useOfflineMutation({
+    mutationFn: createTransaction,
+    mutationKey: ["createTransaction"],
+    meta: { offlineKey: "createTransaction" },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["transacoes"] });
       toast({ title: "Transação cadastrada com sucesso!" });
       setOpen(false);
       setFormData({
-        tipo: "entrada",
+        tipo: "receita",
         descricao: "",
         valor: "",
         categoria: "",
       });
+      if (window.notification) {
+        window.notification.send(
+          "Nova Transação",
+          "Transação cadastrada com sucesso!"
+        );
+      }
     },
     onError: (error: Error) => {
       toast({
@@ -82,14 +104,10 @@ export default function Financeiro() {
     },
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("transacoes")
-        .delete()
-        .eq("id", id);
-      if (error) throw error;
-    },
+  const deleteMutation = useOfflineMutation({
+    mutationFn: deleteTransaction,
+    mutationKey: ["deleteTransaction"],
+    meta: { offlineKey: "deleteTransaction" },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["transacoes"] });
       toast({ title: "Transação excluída com sucesso!" });
@@ -102,6 +120,14 @@ export default function Financeiro() {
       });
     },
   });
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <TransactionSkeleton />
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -125,7 +151,16 @@ export default function Financeiro() {
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
-                  createMutation.mutate(formData);
+                  createMutation.mutate({
+                    ...formData,
+                    tipo: formData.tipo,
+                    data_vencimento: new Date(),
+                    fornecedor_cliente: "",
+                    documento: "",
+                    conta_bancaria: "",
+                    metodo_pagamento: "",
+                    observacoes: "",
+                  });
                 }}
                 className="space-y-4"
               >
@@ -133,7 +168,7 @@ export default function Financeiro() {
                   <Label>Tipo</Label>
                   <Select
                     value={formData.tipo}
-                    onValueChange={(value: "entrada" | "saida") =>
+                    onValueChange={(value: "receita" | "despesa") =>
                       setFormData({ ...formData, tipo: value })
                     }
                   >
@@ -141,8 +176,8 @@ export default function Financeiro() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="entrada">Entrada</SelectItem>
-                      <SelectItem value="saida">Saída</SelectItem>
+                      <SelectItem value="receita">Receita</SelectItem>
+                      <SelectItem value="despesa">Despesa</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -170,12 +205,23 @@ export default function Financeiro() {
                 </div>
                 <div className="space-y-2">
                   <Label>Categoria</Label>
-                  <Input
+                  <Select
                     value={formData.categoria}
-                    onChange={(e) =>
-                      setFormData({ ...formData, categoria: e.target.value })
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, categoria: value })
                     }
-                  />
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categorias.map((cat) => (
+                        <SelectItem key={cat} value={cat}>
+                          {cat}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <Button type="submit" className="w-full">
                   Criar Transação
@@ -205,13 +251,12 @@ export default function Financeiro() {
                   </div>
                   <div className="flex items-center gap-4">
                     <div
-                      className={`text-lg font-bold ${
-                        transacao.tipo === "entrada"
-                          ? "text-success"
-                          : "text-destructive"
-                      }`}
+                      className={`text-lg font-bold ${transacao.tipo === "receita"
+                        ? "text-success"
+                        : "text-destructive"
+                        }`}
                     >
-                      {transacao.tipo === "entrada" ? "+" : "-"}R${" "}
+                      {transacao.tipo === "receita" ? "+" : "-"}R${" "}
                       {Number(transacao.valor).toFixed(2)}
                     </div>
                     <AlertDialog>

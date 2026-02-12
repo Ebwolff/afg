@@ -11,6 +11,8 @@ import { Transacao } from "@/features/financeiro/types";
 
 export default function ContasPagar() {
   const [statusFilter, setStatusFilter] = useState<string>("todas");
+  const [editingTransaction, setEditingTransaction] = useState<Transacao | null>(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
 
   const {
     transacoes,
@@ -34,6 +36,24 @@ export default function ContasPagar() {
       id: transacao.id,
       status: "cancelado",
     });
+  };
+
+  const handleEdit = (transacao: Transacao) => {
+    setEditingTransaction(transacao);
+    setIsEditOpen(true);
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleUpdate = (data: any) => {
+    updateMutation.mutate({
+      ...data,
+      valor: parseFloat(data.valor),
+      data_vencimento: data.data_vencimento instanceof Date ? data.data_vencimento.toISOString() : data.data_vencimento,
+      data_pagamento: data.data_pagamento instanceof Date ? data.data_pagamento.toISOString() : data.data_pagamento,
+      id: editingTransaction?.id,
+    });
+    setIsEditOpen(false);
+    setEditingTransaction(null);
   };
 
   return (
@@ -79,9 +99,22 @@ export default function ContasPagar() {
               onRegistrarPagamento={handleRegistrarPagamento}
               onCancelar={handleCancelar}
               onDelete={(id) => deleteMutation.mutate(id)}
+              onEdit={handleEdit}
             />
           </CardContent>
         </Card>
+
+        <TransactionFormDialog
+          open={isEditOpen}
+          onOpenChange={(open) => {
+            setIsEditOpen(open);
+            if (!open) setEditingTransaction(null);
+          }}
+          onSubmit={handleUpdate}
+          isLoading={updateMutation.isPending}
+          type="despesa"
+          initialData={editingTransaction}
+        />
       </div>
     </Layout>
   );

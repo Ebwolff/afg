@@ -1,7 +1,9 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Transacao, TransactionFormData, ParceladoFormData } from "../types";
+import { Transacao } from "../types";
 import { useToast } from "@/hooks/use-toast";
+import { useOfflineMutation } from "@/hooks/useOfflineMutation";
+import { createTransaction, createParceladoTransaction, updateTransaction, deleteTransaction } from "../api/transactions";
 
 export function useTransactions(type: "receita" | "despesa" = "despesa", statusFilter: string = "todas") {
     const { toast } = useToast();
@@ -26,23 +28,20 @@ export function useTransactions(type: "receita" | "despesa" = "despesa", statusF
         },
     });
 
-    const createMutation = useMutation({
-        mutationFn: async (newTransacao: TransactionFormData) => {
-            const { data: { user } } = await supabase.auth.getUser();
-            const { error } = await supabase.from("transacoes").insert({
-                ...newTransacao,
-                valor: parseFloat(newTransacao.valor),
-                data_vencimento: newTransacao.data_vencimento.toISOString(),
-                tipo: type,
-                status: "pendente",
-                created_by: user?.id,
-                data: new Date().toISOString(),
-            });
-            if (error) throw error;
-        },
+    const createMutation = useOfflineMutation({
+        mutationFn: createTransaction,
+        mutationKey: ["createTransaction"],
+        meta: { offlineKey: "createTransaction" },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["transacoes", type] });
+            queryClient.invalidateQueries({ queryKey: ["transacoes-summary"] });
             toast({ title: `Conta a ${type === "despesa" ? "pagar" : "receber"} criada com sucesso!` });
+            if (window.notification) {
+                window.notification.send(
+                    `Nova ${type === "despesa" ? "Despesa" : "Receita"}`,
+                    `Conta a ${type === "despesa" ? "pagar" : "receber"} criada com sucesso!`
+                );
+            }
         },
         onError: (error: Error) => {
             toast({
@@ -53,40 +52,20 @@ export function useTransactions(type: "receita" | "despesa" = "despesa", statusF
         },
     });
 
-    const createParceladoMutation = useMutation({
-        mutationFn: async (data: ParceladoFormData) => {
-            const { data: { user } } = await supabase.auth.getUser();
-            const valorParcela = parseFloat(data.valor_total) / parseInt(data.numero_parcelas);
-            const parcelas = [];
-
-            for (let i = 0; i < parseInt(data.numero_parcelas); i++) {
-                const dataVencimento = new Date(data.data_primeiro_vencimento);
-                dataVencimento.setMonth(dataVencimento.getMonth() + i);
-
-                parcelas.push({
-                    descricao: data.descricao,
-                    valor: valorParcela,
-                    categoria: data.categoria,
-                    data_vencimento: dataVencimento.toISOString(),
-                    fornecedor_cliente: data.fornecedor_cliente,
-                    documento: data.documento,
-                    conta_bancaria: data.conta_bancaria,
-                    observacoes: data.observacoes,
-                    parcela_numero: i + 1,
-                    parcela_total: parseInt(data.numero_parcelas),
-                    tipo: type,
-                    status: "pendente",
-                    created_by: user?.id,
-                    data: new Date().toISOString(),
-                });
-            }
-
-            const { error } = await supabase.from("transacoes").insert(parcelas);
-            if (error) throw error;
-        },
+    const createParceladoMutation = useOfflineMutation({
+        mutationFn: createParceladoTransaction,
+        mutationKey: ["createParceladoTransaction"],
+        meta: { offlineKey: "createParceladoTransaction" },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["transacoes", type] });
+            queryClient.invalidateQueries({ queryKey: ["transacoes-summary"] });
             toast({ title: "Contas parceladas criadas com sucesso!" });
+            if (window.notification) {
+                window.notification.send(
+                    `Nova ${type === "despesa" ? "Despesa" : "Receita"} Parcelada`,
+                    "Contas parceladas criadas com sucesso!"
+                );
+            }
         },
         onError: (error: Error) => {
             toast({
@@ -97,16 +76,13 @@ export function useTransactions(type: "receita" | "despesa" = "despesa", statusF
         },
     });
 
-    const updateMutation = useMutation({
-        mutationFn: async ({ id, ...updates }: Partial<Transacao> & { id: string }) => {
-            const { error } = await supabase
-                .from("transacoes")
-                .update(updates)
-                .eq("id", id);
-            if (error) throw error;
-        },
+    const updateMutation = useOfflineMutation({
+        mutationFn: updateTransaction,
+        mutationKey: ["updateTransaction"],
+        meta: { offlineKey: "updateTransaction" },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["transacoes", type] });
+            queryClient.invalidateQueries({ queryKey: ["transacoes-summary"] });
             toast({ title: "Conta atualizada com sucesso!" });
         },
         onError: (error: Error) => {
@@ -118,16 +94,57 @@ export function useTransactions(type: "receita" | "despesa" = "despesa", statusF
         },
     });
 
-    const deleteMutation = useMutation({
-        mutationFn: async (id: string) => {
-            const { error } = await supabase.from("transacoes").delete().eq("id", id);
-            if (error) throw error;
+    const deleteMutation = useOfflineMutation({
+        mutationFn: deleteTransaction,
+        mutationKey: ["deleteTransaction"],
+        meta: { offlineKey: "deleteTransaction" },
+        onMutate: async (id: string) => {
+            // Cancelar refetches pendentes
+            await queryClient.cancelQueries({ queryKey: ["transacoes", type] });
+            await queryClient.cancelQueries({ queryKey: ["transacoes-summary"] });
+
+            // Snapshot dos valores anteriores
+            const previousTransacoes = queryClient.getQueryData<Transacao[]>(["transacoes", type, statusFilter]);
+            const previousSummary = queryClient.getQueryData<Transacao[]>(["transacoes-summary"]);
+
+            // Atualização Otimista: Remover o item das listas
+            if (previousTransacoes) {
+                queryClient.setQueryData<Transacao[]>(["transacoes", type, statusFilter], (old) =>
+                    old ? old.filter((t) => t.id !== id) : []
+                );
+            }
+
+            if (previousSummary) {
+                queryClient.setQueryData<Transacao[]>(["transacoes-summary"], (old) =>
+                    old ? old.filter((t) => t.id !== id) : []
+                );
+            }
+
+            return { previousTransacoes, previousSummary };
         },
-        onSuccess: () => {
+        onSuccess: (_data, id) => {
+            // Garantir que o cache esteja atualizado (caso o onMutate não tenha rodado ou para confirmar)
+            queryClient.setQueryData<Transacao[]>(["transacoes", type, statusFilter], (old) =>
+                old ? old.filter((t) => t.id !== id) : []
+            );
+            queryClient.setQueryData<Transacao[]>(["transacoes-summary"], (old) =>
+                old ? old.filter((t) => t.id !== id) : []
+            );
+
             queryClient.invalidateQueries({ queryKey: ["transacoes", type] });
+            queryClient.invalidateQueries({ queryKey: ["transacoes-summary"] });
             toast({ title: "Conta excluída com sucesso!" });
         },
-        onError: (error: Error) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        onError: (error: Error, _id, context: any) => {
+            // Rollback em caso de erro
+            if (context?.previousTransacoes) {
+                queryClient.setQueryData(["transacoes", type, statusFilter], context.previousTransacoes);
+            }
+            if (context?.previousSummary) {
+                queryClient.setQueryData(["transacoes-summary"], context.previousSummary);
+            }
+
             toast({
                 title: "Erro ao excluir conta",
                 description: error.message,

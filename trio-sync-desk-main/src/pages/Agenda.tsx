@@ -26,6 +26,8 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 
+import { handleSupabaseError } from "@/integrations/supabase/error-handler";
+
 export default function Agenda() {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
@@ -46,7 +48,7 @@ export default function Agenda() {
         .from("eventos")
         .select("*")
         .order("data_inicio", { ascending: true });
-      if (error) throw error;
+      if (error) handleSupabaseError(error, "Erro ao carregar eventos");
       return data;
     },
   });
@@ -60,7 +62,7 @@ export default function Agenda() {
         ...values,
         created_by: user.id,
       });
-      if (error) throw error;
+      if (error) handleSupabaseError(error, "Erro ao criar evento");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["eventos"] });
@@ -74,6 +76,15 @@ export default function Agenda() {
         local: "",
       });
     },
+    onError: (error: Error) => {
+      if (error.name !== "AppError") {
+        toast({
+          title: "Erro ao criar evento",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
+    },
   });
 
   const deleteMutation = useMutation({
@@ -82,18 +93,20 @@ export default function Agenda() {
         .from("eventos")
         .delete()
         .eq("id", id);
-      if (error) throw error;
+      if (error) handleSupabaseError(error, "Erro ao excluir evento");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["eventos"] });
       toast({ title: "Evento excluído com sucesso!" });
     },
     onError: (error: Error) => {
-      toast({
-        title: "Erro ao excluir evento",
-        description: error.message,
-        variant: "destructive",
-      });
+      if (error.name !== "AppError") {
+        toast({
+          title: "Erro ao excluir evento",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
     },
   });
 
@@ -222,8 +235,8 @@ export default function Agenda() {
                       {evento.tipo === "reuniao"
                         ? "Reunião"
                         : evento.tipo === "acao_venda"
-                        ? "Ação de Venda"
-                        : "Outro"}
+                          ? "Ação de Venda"
+                          : "Outro"}
                     </Badge>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>

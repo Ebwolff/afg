@@ -4,16 +4,28 @@ import { DashboardSummaryCards } from "@/features/dashboard/components/Dashboard
 import { DashboardCharts } from "@/features/dashboard/components/DashboardCharts";
 import { DashboardAlerts } from "@/features/dashboard/components/DashboardAlerts";
 
+import { DashboardSkeleton } from "@/components/skeletons/DashboardSkeleton";
+
 export default function Dashboard() {
   const {
     loading,
-    saldo,
-    statusData,
-    fluxoData,
-    alertas,
     clientesCount,
     atendimentosCount,
+    saldo,
+    fluxoData,
+    statusData,
+    alertas, // Keep alerts for DashboardAlerts
   } = useDashboardData();
+
+
+
+  if (loading) {
+    return (
+      <Layout>
+        <DashboardSkeleton />
+      </Layout>
+    );
+  }
 
   return (
     <Layout>

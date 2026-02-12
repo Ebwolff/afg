@@ -3,12 +3,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { subMonths, startOfMonth, endOfMonth, addDays, isAfter, isBefore, parseISO, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
+import { handleSupabaseError } from "@/integrations/supabase/error-handler";
+
 export function useDashboardData() {
     const { data: transacoes, isLoading: loadingTransacoes } = useQuery({
         queryKey: ["transacoes-summary"],
         queryFn: async () => {
             const { data, error } = await supabase.from("transacoes").select("*");
-            if (error) throw error;
+            if (error) handleSupabaseError(error, "Erro ao carregar transações");
             return data;
         },
     });
@@ -19,7 +21,7 @@ export function useDashboardData() {
             const { count, error } = await supabase
                 .from("clientes")
                 .select("*", { count: "exact", head: true });
-            if (error) throw error;
+            if (error) handleSupabaseError(error, "Erro ao contar clientes");
             return count || 0;
         },
     });
@@ -31,7 +33,7 @@ export function useDashboardData() {
                 .from("atendimentos")
                 .select("*", { count: "exact", head: true })
                 .eq("status", "aguardando");
-            if (error) throw error;
+            if (error) handleSupabaseError(error, "Erro ao contar atendimentos");
             return count || 0;
         },
     });
@@ -39,11 +41,14 @@ export function useDashboardData() {
     const calcularSaldo = () => {
         if (!transacoes) return { entradas: 0, saidas: 0, saldo: 0 };
         const entradas = transacoes
-            .filter((t) => t.tipo === "entrada")
+            .filter((t) => t.tipo === "receita")
             .reduce((acc, t) => acc + Number(t.valor), 0);
         const saidas = transacoes
-            .filter((t) => t.tipo === "saida")
+            .filter((t) => t.tipo === "despesa")
             .reduce((acc, t) => acc + Number(t.valor), 0);
+
+        console.log("Dashboard Balance Calculation:", { entradas, saidas, saldo: entradas - saidas });
+
         return { entradas, saidas, saldo: entradas - saidas };
     };
 
@@ -80,7 +85,7 @@ export function useDashboardData() {
                 transacoes
                     ?.filter(
                         (t) =>
-                            t.tipo === "entrada" &&
+                            t.tipo === "receita" &&
                             t.data_pagamento &&
                             new Date(t.data_pagamento) >= start &&
                             new Date(t.data_pagamento) <= end
@@ -91,7 +96,7 @@ export function useDashboardData() {
                 transacoes
                     ?.filter(
                         (t) =>
-                            t.tipo === "saida" &&
+                            t.tipo === "despesa" &&
                             t.data_pagamento &&
                             new Date(t.data_pagamento) >= start &&
                             new Date(t.data_pagamento) <= end
@@ -116,6 +121,7 @@ export function useDashboardData() {
 
         const vencidas = transacoes.filter(
             (c) =>
+                c.tipo === "despesa" &&
                 c.status === "pendente" &&
                 c.data_vencimento &&
                 isBefore(parseISO(c.data_vencimento), hoje)
@@ -123,6 +129,7 @@ export function useDashboardData() {
 
         const vencendo = transacoes.filter(
             (c) =>
+                c.tipo === "despesa" &&
                 c.status === "pendente" &&
                 c.data_vencimento &&
                 isAfter(parseISO(c.data_vencimento), hoje) &&
@@ -146,5 +153,6 @@ export function useDashboardData() {
         alertas: getAlertasVencimento(),
         clientesCount,
         atendimentosCount,
+        recentTransactions: transacoes?.slice(0, 5) || [],
     };
 }

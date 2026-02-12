@@ -1,28 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Cliente, ClienteFormData } from "../types";
 import { useToast } from "@/hooks/use-toast";
-
-const STORAGE_KEY = "clientes_local_storage";
-
-// Função para obter clientes do localStorage
-const getClientesFromStorage = (): Cliente[] => {
-    try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        return stored ? JSON.parse(stored) : [];
-    } catch (error) {
-        console.error("Erro ao ler clientes do localStorage:", error);
-        return [];
-    }
-};
-
-// Função para salvar clientes no localStorage
-const saveClientesToStorage = (clientes: Cliente[]) => {
-    try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(clientes));
-    } catch (error) {
-        console.error("Erro ao salvar clientes no localStorage:", error);
-    }
-};
 
 export function useClientes() {
     const { toast } = useToast();
@@ -31,29 +10,31 @@ export function useClientes() {
     const { data: clientes, isLoading } = useQuery({
         queryKey: ["clientes"],
         queryFn: async () => {
-            // Simular delay de rede para melhor UX
-            await new Promise(resolve => setTimeout(resolve, 100));
-            return getClientesFromStorage();
+            const { data, error } = await supabase
+                .from("clientes")
+                .select("*")
+                .order("created_at", { ascending: false });
+
+            if (error) throw error;
+            return data as Cliente[];
         },
     });
 
     const createMutation = useMutation({
         mutationFn: async (newCliente: ClienteFormData) => {
-            const currentClientes = getClientesFromStorage();
+            const { data: { user } } = await supabase.auth.getUser();
 
-            // Criar novo cliente
-            const cliente: Cliente = {
-                id: crypto.randomUUID(),
-                ...newCliente,
-                created_at: new Date().toISOString(),
-                created_by: "local-user",
-            };
+            const { data, error } = await supabase
+                .from("clientes")
+                .insert({
+                    ...newCliente,
+                    created_by: user?.id
+                })
+                .select()
+                .single();
 
-            // Adicionar ao array e salvar
-            const updatedClientes = [cliente, ...currentClientes];
-            saveClientesToStorage(updatedClientes);
-
-            return cliente;
+            if (error) throw error;
+            return data;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["clientes"] });
@@ -71,22 +52,43 @@ export function useClientes() {
 
     const deleteMutation = useMutation({
         mutationFn: async (id: string) => {
-            const currentClientes = getClientesFromStorage();
-            const updatedClientes = currentClientes.filter(cliente => cliente.id !== id);
-            saveClientesToStorage(updatedClientes);
-            return updatedClientes;
+            const { data, error } = await supabase
+                .from("clientes")
+                .delete()
+                .eq("id", id)
+                .select();
+
+            if (error) throw error;
+            if (!data || data.length === 0) {
+                throw new Error("Não foi possível excluir o cliente. Verifique as permissões ou se o cliente já foi excluído.");
+            }
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["clientes"] });
-            queryClient.invalidateQueries({ queryKey: ["clientes-count"] });
-            toast({ title: "Cliente excluído com sucesso!" });
+        onMutate: async (id) => {
+            await queryClient.cancelQueries({ queryKey: ["clientes"] });
+            const previousClientes = queryClient.getQueryData<Cliente[]>(["clientes"]);
+
+            queryClient.setQueryData<Cliente[]>(["clientes"], (old) =>
+                old ? old.filter((cliente) => cliente.id !== id) : []
+            );
+
+            return { previousClientes };
         },
-        onError: (error: Error) => {
+        onError: (err, id, context) => {
+            if (context?.previousClientes) {
+                queryClient.setQueryData(["clientes"], context.previousClientes);
+            }
             toast({
                 title: "Erro ao excluir cliente",
-                description: error.message,
+                description: err.message,
                 variant: "destructive",
             });
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ["clientes"] });
+            queryClient.invalidateQueries({ queryKey: ["clientes-count"] });
+        },
+        onSuccess: () => {
+            toast({ title: "Cliente excluído com sucesso!" });
         },
     });
 

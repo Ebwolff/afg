@@ -3,6 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Produto, ProdutoFormData } from "../types";
 import { useToast } from "@/hooks/use-toast";
 
+import { handleSupabaseError } from "@/integrations/supabase/error-handler";
+
 export function useProdutos() {
     const { toast } = useToast();
     const queryClient = useQueryClient();
@@ -15,7 +17,7 @@ export function useProdutos() {
                 .select("*")
                 .eq("ativo", true)
                 .order("created_at", { ascending: false });
-            if (error) throw error;
+            if (error) handleSupabaseError(error, "Erro ao carregar produtos");
             return data as Produto[];
         },
     });
@@ -33,18 +35,22 @@ export function useProdutos() {
                     created_by: user.id,
                 },
             ]);
-            if (error) throw error;
+            if (error) handleSupabaseError(error, "Erro ao cadastrar produto");
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["produtos"] });
             toast({ title: "Produto/Serviço cadastrado com sucesso!" });
         },
         onError: (error: Error) => {
-            toast({
-                title: "Erro ao cadastrar produto/serviço",
-                description: error.message,
-                variant: "destructive",
-            });
+            // AppError is already handled or we can let specific toast handle it if needed
+            // But here we kept the toast. Standard error handler throws, so this catches it.
+            if (error.name !== "AppError") {
+                toast({
+                    title: "Erro ao cadastrar produto/serviço",
+                    description: error.message,
+                    variant: "destructive",
+                });
+            }
         },
     });
 
@@ -54,7 +60,7 @@ export function useProdutos() {
                 .from("produtos")
                 .update({ ativo: false })
                 .eq("id", id);
-            if (error) throw error;
+            if (error) handleSupabaseError(error, "Erro ao remover produto");
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["produtos"] });
