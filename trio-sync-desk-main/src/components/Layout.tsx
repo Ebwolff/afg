@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { LayoutDashboard, Users, UserCircle, Package, Calendar, DollarSign, LogOut, Calculator, FileText, ArrowDownCircle, ArrowUpCircle, Image, CheckSquare } from "lucide-react";
+import { LayoutDashboard, Users, UserCircle, Package, Calendar, DollarSign, LogOut, Calculator, FileText, ArrowDownCircle, ArrowUpCircle, Image, CheckSquare, Target } from "lucide-react";
 import { Button } from "./ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -39,6 +39,9 @@ export function Layout({ children }: LayoutProps) {
           <nav className="flex-1 space-y-1 p-4">
             <NavLink to="/dashboard" icon={LayoutDashboard}>
               Dashboard
+            </NavLink>
+            <NavLink to="/leads" icon={Target}>
+              Leads
             </NavLink>
             <NavLink to="/tasks" icon={CheckSquare}>
               Tarefas

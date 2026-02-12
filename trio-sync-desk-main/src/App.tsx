@@ -25,6 +25,7 @@ const SimuladorConsorcio = lazy(() => import("./pages/SimuladorConsorcio"));
 const Relatorios = lazy(() => import("./pages/Relatorios"));
 const Banners = lazy(() => import("./pages/Banners"));
 const TasksPage = lazy(() => import("./features/tasks/pages/TasksPage"));
+const LeadsPage = lazy(() => import("./features/leads/pages/LeadsPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -59,6 +60,7 @@ const App = () => (
                 <Route path="/contas-pagar" element={<ContasPagar />} />
                 <Route path="/contas-receber" element={<ContasReceber />} />
                 <Route path="/tasks" element={<TasksPage />} />
+                <Route path="/leads" element={<LeadsPage />} />
                 <Route path="/atendimentos" element={<Atendimentos />} />
                 <Route path="/clientes" element={<Clientes />} />
                 <Route path="/produtos" element={<Produtos />} />
