@@ -19,17 +19,17 @@ CREATE TABLE public.tasks (
 
 ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Usuários autenticados podem ver tarefas"
+CREATE POLICY "Usuários autorizados podem ver tarefas"
   ON public.tasks FOR SELECT
-  USING (auth.uid() IS NOT NULL);
+  USING (auth.uid() = created_by OR auth.uid() = assigned_to OR public.has_role(auth.uid(), 'admin'));
 
 CREATE POLICY "Usuários autenticados podem criar tarefas"
   ON public.tasks FOR INSERT
   WITH CHECK (auth.uid() IS NOT NULL);
 
-CREATE POLICY "Usuários autenticados podem atualizar tarefas"
+CREATE POLICY "Usuários autorizados podem atualizar tarefas"
   ON public.tasks FOR UPDATE
-  USING (auth.uid() IS NOT NULL);
+  USING (auth.uid() = created_by OR auth.uid() = assigned_to OR public.has_role(auth.uid(), 'admin'));
 
 CREATE POLICY "Usuários autenticados podem deletar tarefas"
   ON public.tasks FOR DELETE
