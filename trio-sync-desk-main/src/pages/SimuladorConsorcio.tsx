@@ -19,8 +19,8 @@ export default function SimuladorConsorcio() {
   const [prazoMeses, setPrazoMeses] = useState("");
   const [taxaAdmin, setTaxaAdmin] = useState("10");
   const [observacoes, setObservacoes] = useState("");
+  const [porcentagemReduzida, setPorcentagemReduzida] = useState("100");
   const [valorParcela, setValorParcela] = useState(0);
-  const [valorMeiaParcela, setValorMeiaParcela] = useState(0);
 
   const calcularParcela = () => {
     const valor = parseFloat(valorCarta);
@@ -31,7 +31,6 @@ export default function SimuladorConsorcio() {
       const valorComTaxa = valor * (1 + taxa);
       const parcela = valorComTaxa / prazo;
       setValorParcela(parcela);
-      setValorMeiaParcela(parcela / 2);
     }
   };
 
@@ -202,24 +201,31 @@ export default function SimuladorConsorcio() {
       doc.setFont("helvetica", "bold");
       doc.text(`R$ ${valorParcela.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, pageWidth / 2, yPos + 22, { align: "center" });
 
-      // --- Destaque Meia Parcela ---
+      // --- Destaque Parcela Reduzida ---
       yPos += boxHeight + 6;
-      const halfBoxHeight = 22;
-      doc.setDrawColor(...primaryColor);
-      doc.setLineWidth(0.5);
-      doc.setFillColor(240, 253, 244);
-      doc.roundedRect(marginLeft, yPos, contentWidth, halfBoxHeight, 3, 3, 'FD');
 
-      doc.setTextColor(...primaryColor);
-      doc.setFontSize(8);
-      doc.setFont("helvetica", "bold");
-      doc.text("OPÇÃO DE MEIA PARCELA (ATÉ CONTEMPLAÇÃO)", pageWidth / 2, yPos + 8, { align: "center" });
+      if (porcentagemReduzida !== "100") {
+        const halfBoxHeight = 22;
+        doc.setDrawColor(...primaryColor);
+        doc.setLineWidth(0.5);
+        doc.setFillColor(240, 253, 244);
+        doc.roundedRect(marginLeft, yPos, contentWidth, halfBoxHeight, 3, 3, 'FD');
 
-      doc.setFontSize(14);
-      doc.text(`R$ ${(valorParcela / 2).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, pageWidth / 2, yPos + 18, { align: "center" });
+        doc.setTextColor(...primaryColor);
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "bold");
+        const labelText = porcentagemReduzida === "50"
+          ? "OPÇÃO DE MEIA PARCELA (ATÉ CONTEMPLAÇÃO)"
+          : `OPÇÃO DE PARCELA REDUZIDA ${porcentagemReduzida}% (ATÉ CONTEMPLAÇÃO)`;
+        doc.text(labelText, pageWidth / 2, yPos + 8, { align: "center" });
+
+        doc.setFontSize(14);
+        doc.text(`R$ ${(valorParcela * (parseFloat(porcentagemReduzida) / 100)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, pageWidth / 2, yPos + 18, { align: "center" });
+
+        yPos += halfBoxHeight + 6;
+      }
 
       // --- Aviso ---
-      yPos += halfBoxHeight + 5;
       doc.setTextColor(...mutedColor);
       doc.setFontSize(7);
       doc.setFont("helvetica", "normal");
@@ -284,6 +290,7 @@ export default function SimuladorConsorcio() {
     setValorCarta("");
     setPrazoMeses("");
     setTaxaAdmin("10");
+    setPorcentagemReduzida("100");
     setObservacoes("");
     setValorParcela(0);
   };
@@ -365,6 +372,25 @@ export default function SimuladorConsorcio() {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="porcentagemReduzida">Opção de Parcela Até Contemplação</Label>
+                <Select value={porcentagemReduzida} onValueChange={setPorcentagemReduzida}>
+                  <SelectTrigger id="porcentagemReduzida">
+                    <SelectValue placeholder="Selecione a porcentagem" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="100">Parcela Integral (100%)</SelectItem>
+                    <SelectItem value="80">Parcela Reduzida (80%)</SelectItem>
+                    <SelectItem value="75">Parcela Reduzida (75%)</SelectItem>
+                    <SelectItem value="70">Parcela Reduzida (70%)</SelectItem>
+                    <SelectItem value="60">Parcela Reduzida (60%)</SelectItem>
+                    <SelectItem value="50">Meia Parcela (50%)</SelectItem>
+                    <SelectItem value="40">Parcela Reduzida (40%)</SelectItem>
+                    <SelectItem value="30">Parcela Reduzida (30%)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="obs">Observações</Label>
                 <Textarea
                   id="obs"
@@ -397,12 +423,16 @@ export default function SimuladorConsorcio() {
                       </span>
                     </div>
 
-                    <div className="flex justify-between items-center p-4 bg-green-50 rounded-lg border border-green-200">
-                      <span className="text-sm font-medium text-[#0f572d]">Meia Parcela (até contemplação)</span>
-                      <span className="text-2xl font-bold text-[#0f572d]">
-                        R$ {valorMeiaParcela.toFixed(2)}
-                      </span>
-                    </div>
+                    {porcentagemReduzida !== "100" && (
+                      <div className="flex justify-between items-center p-4 bg-green-50 rounded-lg border border-green-200">
+                        <span className="text-sm font-medium text-[#0f572d]">
+                          {porcentagemReduzida === "50" ? "Meia Parcela" : `Parcela Reduzida (${porcentagemReduzida}%)`} (até contemplação)
+                        </span>
+                        <span className="text-2xl font-bold text-[#0f572d]">
+                          R$ {(valorParcela * (parseFloat(porcentagemReduzida) / 100)).toFixed(2)}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-2">
