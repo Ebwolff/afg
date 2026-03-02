@@ -17,22 +17,9 @@ export default function SimuladorConsorcio() {
   const [tipoBem, setTipoBem] = useState("");
   const [valorCarta, setValorCarta] = useState("");
   const [prazoMeses, setPrazoMeses] = useState("");
-  const [taxaAdmin, setTaxaAdmin] = useState("10");
+  const [valorParcela, setValorParcela] = useState("");
   const [observacoes, setObservacoes] = useState("");
   const [porcentagemReduzida, setPorcentagemReduzida] = useState("100");
-  const [valorParcela, setValorParcela] = useState(0);
-
-  const calcularParcela = () => {
-    const valor = parseFloat(valorCarta);
-    const prazo = parseInt(prazoMeses);
-    const taxa = parseFloat(taxaAdmin) / 100;
-
-    if (valor && prazo && taxa >= 0) {
-      const valorComTaxa = valor * (1 + taxa);
-      const parcela = valorComTaxa / prazo;
-      setValorParcela(parcela);
-    }
-  };
 
   const salvarSimulacao = async () => {
     if (!clienteNome || !tipoBem || !valorCarta || !prazoMeses) {
@@ -51,8 +38,8 @@ export default function SimuladorConsorcio() {
       tipo_bem: tipoBem,
       valor_carta: parseFloat(valorCarta),
       prazo_meses: parseInt(prazoMeses),
-      valor_parcela: valorParcela,
-      taxa_administracao: parseFloat(taxaAdmin),
+      valor_parcela: parseFloat(valorParcela),
+      taxa_administracao: 0,
       observacoes: observacoes || null,
       created_by: user.id,
     });
@@ -68,7 +55,7 @@ export default function SimuladorConsorcio() {
   };
 
   const gerarPDF = async () => {
-    if (!clienteNome || !tipoBem || !valorCarta || !prazoMeses || valorParcela <= 0) {
+    if (!clienteNome || !tipoBem || !valorCarta || !prazoMeses || parseFloat(valorParcela) <= 0) {
       toast.error("Calcule a simulação antes de gerar o PDF");
       return;
     }
@@ -180,11 +167,10 @@ export default function SimuladorConsorcio() {
 
       addRow("Valor do Crédito", `R$ ${parseFloat(valorCarta).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`);
       addRow("Prazo do Plano", `${prazoMeses} meses`);
-      addRow("Taxa Administrativa", `${taxaAdmin}%`);
 
-      const custoAdmin = parseFloat(valorCarta) * (parseFloat(taxaAdmin) / 100);
-      addRow("Custo Administrativo", `R$ ${custoAdmin.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`);
-      addRow("Valor Total do Plano", `R$ ${(valorParcela * parseInt(prazoMeses)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`);
+      const vParcelaNum = parseFloat(valorParcela);
+      const prazoNum = parseInt(prazoMeses);
+      addRow("Valor Total do Plano", `R$ ${(vParcelaNum * prazoNum).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`);
 
       // --- Destaque Parcela Cheia ---
       yPos += 4;
@@ -199,7 +185,7 @@ export default function SimuladorConsorcio() {
 
       doc.setFontSize(20);
       doc.setFont("helvetica", "bold");
-      doc.text(`R$ ${valorParcela.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, pageWidth / 2, yPos + 22, { align: "center" });
+      doc.text(`R$ ${parseFloat(valorParcela).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, pageWidth / 2, yPos + 22, { align: "center" });
 
       // --- Destaque Parcela Reduzida ---
       yPos += boxHeight + 6;
@@ -220,7 +206,7 @@ export default function SimuladorConsorcio() {
         doc.text(labelText, pageWidth / 2, yPos + 8, { align: "center" });
 
         doc.setFontSize(14);
-        doc.text(`R$ ${(valorParcela * (parseFloat(porcentagemReduzida) / 100)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, pageWidth / 2, yPos + 18, { align: "center" });
+        doc.text(`R$ ${(parseFloat(valorParcela) * (parseFloat(porcentagemReduzida) / 100)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, pageWidth / 2, yPos + 18, { align: "center" });
 
         yPos += halfBoxHeight + 6;
       }
@@ -285,14 +271,11 @@ export default function SimuladorConsorcio() {
   };
 
   const limparFormulario = () => {
-    setClienteNome("");
-    setTipoBem("");
     setValorCarta("");
     setPrazoMeses("");
-    setTaxaAdmin("10");
+    setValorParcela("");
     setPorcentagemReduzida("100");
     setObservacoes("");
-    setValorParcela(0);
   };
 
   return (
@@ -360,14 +343,13 @@ export default function SimuladorConsorcio() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="taxa">Taxa de Administração (%)</Label>
+                <Label htmlFor="parcela">Valor da Parcela Cheia *</Label>
                 <Input
-                  id="taxa"
+                  id="parcela"
                   type="number"
-                  value={taxaAdmin}
-                  onChange={(e) => setTaxaAdmin(e.target.value)}
-                  placeholder="10"
-                  step="0.1"
+                  value={valorParcela}
+                  onChange={(e) => setValorParcela(e.target.value)}
+                  placeholder="0.00"
                 />
               </div>
 
@@ -401,9 +383,18 @@ export default function SimuladorConsorcio() {
                 />
               </div>
 
-              <Button onClick={calcularParcela} className="w-full">
-                Calcular Parcelas
-              </Button>
+              <div className="space-y-2">
+                <Button onClick={salvarSimulacao} className="w-full">
+                  Salvar Simulação
+                </Button>
+                <Button onClick={gerarPDF} variant="outline" className="w-full">
+                  <FileDown className="h-4 w-4 mr-2" />
+                  Gerar PDF
+                </Button>
+                <Button onClick={limparFormulario} variant="ghost" className="w-full">
+                  Limpar
+                </Button>
+              </div>
             </CardContent>
           </Card>
 
@@ -413,13 +404,13 @@ export default function SimuladorConsorcio() {
               <CardDescription>Valores calculados automaticamente</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {valorParcela > 0 ? (
+              {parseFloat(valorParcela) > 0 ? (
                 <>
                   <div className="space-y-4">
                     <div className="flex justify-between items-center p-4 bg-primary/10 rounded-lg border border-primary/20">
                       <span className="text-sm font-medium text-primary">Parcela Cheia</span>
                       <span className="text-2xl font-bold text-primary">
-                        R$ {valorParcela.toFixed(2)}
+                        R$ {parseFloat(valorParcela).toFixed(2)}
                       </span>
                     </div>
 
@@ -429,7 +420,7 @@ export default function SimuladorConsorcio() {
                           {porcentagemReduzida === "50" ? "Meia Parcela" : `Parcela Reduzida (${porcentagemReduzida}%)`} (até contemplação)
                         </span>
                         <span className="text-2xl font-bold text-[#0f572d]">
-                          R$ {(valorParcela * (parseFloat(porcentagemReduzida) / 100)).toFixed(2)}
+                          R$ {(parseFloat(valorParcela) * (parseFloat(porcentagemReduzida) / 100)).toFixed(2)}
                         </span>
                       </div>
                     )}
@@ -438,32 +429,18 @@ export default function SimuladorConsorcio() {
                   <div className="space-y-2">
                     <div className="flex justify-between p-3 border-b">
                       <span className="text-sm text-muted-foreground">Valor da Carta</span>
-                      <span className="font-medium">R$ {parseFloat(valorCarta).toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between p-3 border-b">
-                      <span className="text-sm text-muted-foreground">Taxa de Administração</span>
-                      <span className="font-medium">{taxaAdmin}%</span>
+                      <span className="font-medium">R$ {parseFloat(valorCarta || "0").toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between p-3 border-b">
                       <span className="text-sm text-muted-foreground">Prazo</span>
-                      <span className="font-medium">{prazoMeses} meses</span>
+                      <span className="font-medium">{prazoMeses || "0"} meses</span>
                     </div>
                     <div className="flex justify-between p-3">
-                      <span className="text-sm text-muted-foreground">Valor Total</span>
+                      <span className="text-sm text-muted-foreground">Valor Total do Plano</span>
                       <span className="font-medium">
-                        R$ {(valorParcela * parseInt(prazoMeses)).toFixed(2)}
+                        R$ {(parseFloat(valorParcela) * parseInt(prazoMeses || "0")).toFixed(2)}
                       </span>
                     </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Button onClick={salvarSimulacao} className="w-full">
-                      Salvar Simulação
-                    </Button>
-                    <Button onClick={gerarPDF} variant="outline" className="w-full">
-                      <FileDown className="h-4 w-4 mr-2" />
-                      Gerar PDF
-                    </Button>
                   </div>
                 </>
               ) : (
