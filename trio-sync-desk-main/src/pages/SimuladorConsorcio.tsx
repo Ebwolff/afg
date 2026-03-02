@@ -18,8 +18,8 @@ export default function SimuladorConsorcio() {
   const [valorCarta, setValorCarta] = useState("");
   const [prazoMeses, setPrazoMeses] = useState("");
   const [valorParcela, setValorParcela] = useState("");
+  const [valorParcelaReduzida, setValorParcelaReduzida] = useState("");
   const [observacoes, setObservacoes] = useState("");
-  const [porcentagemReduzida, setPorcentagemReduzida] = useState("100");
 
   const salvarSimulacao = async () => {
     if (!clienteNome || !tipoBem || !valorCarta || !prazoMeses) {
@@ -189,7 +189,7 @@ export default function SimuladorConsorcio() {
       // --- Destaque Parcela Reduzida ---
       yPos += boxHeight + 6;
 
-      if (porcentagemReduzida !== "100") {
+      if (valorParcelaReduzida && parseFloat(valorParcelaReduzida) > 0) {
         const halfBoxHeight = 22;
         doc.setDrawColor(...primaryColor);
         doc.setLineWidth(0.5);
@@ -199,13 +199,10 @@ export default function SimuladorConsorcio() {
         doc.setTextColor(...primaryColor);
         doc.setFontSize(8);
         doc.setFont("helvetica", "bold");
-        const labelText = porcentagemReduzida === "50"
-          ? "OPÇÃO DE MEIA PARCELA (ATÉ CONTEMPLAÇÃO)"
-          : `OPÇÃO DE PARCELA REDUZIDA ${porcentagemReduzida}% (ATÉ CONTEMPLAÇÃO)`;
-        doc.text(labelText, pageWidth / 2, yPos + 8, { align: "center" });
+        doc.text("VALOR DA PARCELA COM REDUÇÃO (ATÉ CONTEMPLAÇÃO)", pageWidth / 2, yPos + 8, { align: "center" });
 
         doc.setFontSize(14);
-        doc.text(`R$ ${(parseFloat(valorParcela) * (parseFloat(porcentagemReduzida) / 100)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, pageWidth / 2, yPos + 18, { align: "center" });
+        doc.text(`R$ ${parseFloat(valorParcelaReduzida).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, pageWidth / 2, yPos + 18, { align: "center" });
 
         yPos += halfBoxHeight + 6;
       }
@@ -273,7 +270,7 @@ export default function SimuladorConsorcio() {
     setValorCarta("");
     setPrazoMeses("");
     setValorParcela("");
-    setPorcentagemReduzida("100");
+    setValorParcelaReduzida("");
     setObservacoes("");
   };
 
@@ -353,22 +350,14 @@ export default function SimuladorConsorcio() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="porcentagemReduzida">Opção de Parcela Até Contemplação</Label>
-                <Select value={porcentagemReduzida} onValueChange={setPorcentagemReduzida}>
-                  <SelectTrigger id="porcentagemReduzida">
-                    <SelectValue placeholder="Selecione a porcentagem" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="100">Parcela Integral (100%)</SelectItem>
-                    <SelectItem value="80">Parcela Reduzida (80%)</SelectItem>
-                    <SelectItem value="75">Parcela Reduzida (75%)</SelectItem>
-                    <SelectItem value="70">Parcela Reduzida (70%)</SelectItem>
-                    <SelectItem value="60">Parcela Reduzida (60%)</SelectItem>
-                    <SelectItem value="50">Meia Parcela (50%)</SelectItem>
-                    <SelectItem value="40">Parcela Reduzida (40%)</SelectItem>
-                    <SelectItem value="30">Parcela Reduzida (30%)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="parcelaReduzida">Valor da Parcela com Redução</Label>
+                <Input
+                  id="parcelaReduzida"
+                  type="number"
+                  value={valorParcelaReduzida}
+                  onChange={(e) => setValorParcelaReduzida(e.target.value)}
+                  placeholder="0.00 (opcional)"
+                />
               </div>
 
               <div className="space-y-2">
@@ -413,13 +402,13 @@ export default function SimuladorConsorcio() {
                       </span>
                     </div>
 
-                    {porcentagemReduzida !== "100" && (
+                    {valorParcelaReduzida && parseFloat(valorParcelaReduzida) > 0 && (
                       <div className="flex justify-between items-center p-4 bg-green-50 rounded-lg border border-green-200">
                         <span className="text-sm font-medium text-[#0f572d]">
-                          {porcentagemReduzida === "50" ? "Meia Parcela" : `Parcela Reduzida (${porcentagemReduzida}%)`} (até contemplação)
+                          Parcela com Redução (até contemplação)
                         </span>
                         <span className="text-2xl font-bold text-[#0f572d]">
-                          R$ {(parseFloat(valorParcela) * (parseFloat(porcentagemReduzida) / 100)).toFixed(2)}
+                          R$ {parseFloat(valorParcelaReduzida).toFixed(2)}
                         </span>
                       </div>
                     )}
