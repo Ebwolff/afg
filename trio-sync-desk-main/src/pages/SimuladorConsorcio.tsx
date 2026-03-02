@@ -170,7 +170,6 @@ export default function SimuladorConsorcio() {
 
       const vParcelaNum = parseFloat(valorParcela);
       const prazoNum = parseInt(prazoMeses);
-      addRow("Valor Total do Plano", `R$ ${(vParcelaNum * prazoNum).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`);
 
       // --- Destaque Parcela Cheia ---
       yPos += 4;
@@ -434,12 +433,6 @@ export default function SimuladorConsorcio() {
                     <div className="flex justify-between p-3 border-b">
                       <span className="text-sm text-muted-foreground">Prazo</span>
                       <span className="font-medium">{prazoMeses || "0"} meses</span>
-                    </div>
-                    <div className="flex justify-between p-3">
-                      <span className="text-sm text-muted-foreground">Valor Total do Plano</span>
-                      <span className="font-medium">
-                        R$ {(parseFloat(valorParcela) * parseInt(prazoMeses || "0")).toFixed(2)}
-                      </span>
                     </div>
                   </div>
                 </>
