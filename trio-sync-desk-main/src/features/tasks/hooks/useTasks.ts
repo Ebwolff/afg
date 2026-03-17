@@ -3,6 +3,46 @@ import { supabase } from "@/integrations/supabase/client";
 import { Task, TaskFormData } from "../types";
 import { toast } from "sonner";
 
+const PRIORITY_LABELS: Record<string, string> = {
+    low: "Baixa",
+    medium: "Média",
+    high: "Alta",
+};
+
+async function sendTaskNotification(
+    assignedTo: string,
+    taskTitle: string,
+    priority: string,
+    type: "task_assigned" | "task_update"
+) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || user.id === assignedTo) return;
+
+    const { data: creator } = await supabase
+        .from("profiles")
+        .select("nome")
+        .eq("id", user.id)
+        .single();
+
+    const creatorName = creator?.nome || "Alguém";
+    const prioLabel = PRIORITY_LABELS[priority] || priority;
+
+    const isNew = type === "task_assigned";
+    const title = isNew ? "Nova tarefa atribuída" : "Tarefa atualizada";
+    const message = isNew
+        ? `${creatorName} atribuiu a tarefa "${taskTitle}" para você. Prioridade: ${prioLabel}.`
+        : `${creatorName} atualizou a tarefa "${taskTitle}". Prioridade: ${prioLabel}.`;
+
+    await supabase.from("notifications").insert({
+        user_id: assignedTo,
+        title,
+        message,
+        type,
+        link: "/tasks",
+        read: false,
+    });
+}
+
 export function useTasks() {
     const queryClient = useQueryClient();
 
@@ -41,14 +81,23 @@ export function useTasks() {
                 .single();
 
             if (error) throw error;
+
+            if (newTask.assigned_to) {
+                await sendTaskNotification(
+                    newTask.assigned_to,
+                    newTask.title,
+                    newTask.priority,
+                    "task_assigned"
+                );
+            }
+
             return data;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["tasks"] });
             toast.success("Tarefa criada com sucesso!");
         },
-        onError: (error) => {
-            console.error("Erro ao criar tarefa:", error);
+        onError: () => {
             toast.error("Erro ao criar tarefa.");
         },
     });
@@ -66,14 +115,23 @@ export function useTasks() {
                 .single();
 
             if (error) throw error;
+
+            if (updates.assigned_to) {
+                await sendTaskNotification(
+                    updates.assigned_to,
+                    updates.title || data.title,
+                    updates.priority || data.priority,
+                    "task_update"
+                );
+            }
+
             return data;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["tasks"] });
             toast.success("Tarefa atualizada!");
         },
-        onError: (error) => {
-            console.error("Erro ao atualizar tarefa:", error);
+        onError: () => {
             toast.error("Erro ao atualizar tarefa.");
         },
     });
@@ -87,8 +145,7 @@ export function useTasks() {
             queryClient.invalidateQueries({ queryKey: ["tasks"] });
             toast.success("Tarefa excluída.");
         },
-        onError: (error) => {
-            console.error("Erro ao excluir tarefa:", error);
+        onError: () => {
             toast.error("Erro ao excluir tarefa.");
         },
     });
@@ -102,3 +159,4 @@ export function useTasks() {
         deleteTask,
     };
 }
+
