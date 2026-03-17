@@ -13,7 +13,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth, ALL_PERMISSIONS, AppPermission, AppRole } from "@/hooks/useAuth";
-import { UserPlus, Shield, Settings2, Loader2 } from "lucide-react";
+import { UserPlus, Shield, Settings2, Loader2, Pencil, Trash2 } from "lucide-react";
 
 interface UserProfile {
   id: string;
@@ -34,6 +34,9 @@ export default function Administracao() {
   const [selectedPermissions, setSelectedPermissions] = useState<AppPermission[]>([]);
   const [newUser, setNewUser] = useState({ nome: "", email: "", password: "", role: "servicos" as AppRole });
   const [creatingUser, setCreatingUser] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editUser, setEditUser] = useState<{ id: string; nome: string; role: AppRole } | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const { data: users, isLoading } = useQuery({
     queryKey: ["admin-users"],
@@ -134,6 +137,65 @@ export default function Administracao() {
 
   const selectAll = () => setSelectedPermissions(ALL_PERMISSIONS.map((p) => p.id));
   const deselectAll = () => setSelectedPermissions([]);
+
+  const updateUser = useMutation({
+    mutationFn: async ({ id, nome, role }: { id: string; nome: string; role: AppRole }) => {
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({ nome })
+        .eq("id", id);
+      if (profileError) throw profileError;
+
+      const { error: deleteRoleError } = await supabase
+        .from("user_roles")
+        .delete()
+        .eq("user_id", id);
+      if (deleteRoleError) throw deleteRoleError;
+
+      const { error: insertRoleError } = await supabase
+        .from("user_roles")
+        .insert({ user_id: id, role });
+      if (insertRoleError) throw insertRoleError;
+    },
+    onSuccess: () => {
+      toast({ title: "Usuário atualizado!" });
+      setEditDialogOpen(false);
+      setEditUser(null);
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao atualizar", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteUser = useMutation({
+    mutationFn: async (userId: string) => {
+      const { error: roleError } = await supabase
+        .from("user_roles")
+        .delete()
+        .eq("user_id", userId);
+      if (roleError) throw roleError;
+
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .delete()
+        .eq("id", userId);
+      if (profileError) throw profileError;
+    },
+    onSuccess: () => {
+      toast({ title: "Usuário removido!" });
+      setDeleteConfirmId(null);
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao remover", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const openEditDialog = (user: UserProfile) => {
+    setEditUser({ id: user.id, nome: user.nome, role: user.role || "servicos" });
+    setEditDialogOpen(true);
+  };
 
   if (!isAdmin) {
     return (
@@ -267,16 +329,34 @@ export default function Administracao() {
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        {user.role !== "admin" && (
+                        <div className="flex items-center justify-end gap-2">
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => openPermissionsDialog(user)}
+                            onClick={() => openEditDialog(user)}
                           >
-                            <Settings2 className="mr-1 h-4 w-4" />
-                            Permissões
+                            <Pencil className="mr-1 h-4 w-4" />
+                            Editar
                           </Button>
-                        )}
+                          {user.role !== "admin" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openPermissionsDialog(user)}
+                            >
+                              <Settings2 className="mr-1 h-4 w-4" />
+                              Permissões
+                            </Button>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => setDeleteConfirmId(user.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -328,6 +408,75 @@ export default function Administracao() {
               >
                 {updatePermissions.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Salvar Permissões
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Editar Usuário</DialogTitle>
+            </DialogHeader>
+            {editUser && (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  updateUser.mutate(editUser);
+                }}
+                className="space-y-4"
+              >
+                <div className="space-y-2">
+                  <Label>Nome completo</Label>
+                  <Input
+                    value={editUser.nome}
+                    onChange={(e) => setEditUser({ ...editUser, nome: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Perfil</Label>
+                  <Select
+                    value={editUser.role}
+                    onValueChange={(value: AppRole) => setEditUser({ ...editUser, role: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="admin">Administrador</SelectItem>
+                      <SelectItem value="servicos">Serviços</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button type="submit" className="w-full" disabled={updateUser.isPending}>
+                  {updateUser.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Salvar Alterações
+                </Button>
+              </form>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Confirmar Exclusão</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              Tem certeza que deseja remover este usuário? Esta ação não pode ser desfeita.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>
+                Cancelar
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => deleteConfirmId && deleteUser.mutate(deleteConfirmId)}
+                disabled={deleteUser.isPending}
+              >
+                {deleteUser.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Excluir
               </Button>
             </div>
           </DialogContent>
