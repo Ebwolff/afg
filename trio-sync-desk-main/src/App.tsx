@@ -10,6 +10,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { QueryClient } from "@tanstack/react-query";
 import { HashRouter, Routes, Route } from "react-router-dom";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { AuthProvider } from "./hooks/useAuth";
 
 // Lazy-loaded Pages (code splitting)
 const Index = lazy(() => import("./pages/Index"));
@@ -27,13 +28,14 @@ const Relatorios = lazy(() => import("./pages/Relatorios"));
 const Banners = lazy(() => import("./pages/Banners"));
 const TasksPage = lazy(() => import("./features/tasks/pages/TasksPage"));
 const LeadsPage = lazy(() => import("./features/leads/pages/LeadsPage"));
+const Administracao = lazy(() => import("./pages/Administracao"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      gcTime: 1000 * 60 * 60 * 24, // 24 hours
+      staleTime: 1000 * 60 * 5,
+      gcTime: 1000 * 60 * 60 * 24,
     },
   },
 });
@@ -52,27 +54,30 @@ const App = () => (
         <OfflineSyncManager />
         <ErrorBoundary>
           <HashRouter>
-            <Suspense fallback={<div className="flex items-center justify-center h-screen">Carregando...</div>}>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-                <Route path="/financeiro" element={<ProtectedRoute><Financeiro /></ProtectedRoute>} />
-                <Route path="/contas-pagar" element={<ProtectedRoute><ContasPagar /></ProtectedRoute>} />
-                <Route path="/contas-receber" element={<ProtectedRoute><ContasReceber /></ProtectedRoute>} />
-                <Route path="/tasks" element={<ProtectedRoute><TasksPage /></ProtectedRoute>} />
-                <Route path="/leads" element={<ProtectedRoute><LeadsPage /></ProtectedRoute>} />
-                <Route path="/atendimentos" element={<ProtectedRoute><Atendimentos /></ProtectedRoute>} />
-                <Route path="/clientes" element={<ProtectedRoute><Clientes /></ProtectedRoute>} />
-                <Route path="/produtos" element={<ProtectedRoute><Produtos /></ProtectedRoute>} />
-                <Route path="/agenda" element={<ProtectedRoute><Agenda /></ProtectedRoute>} />
-                <Route path="/simulador" element={<ProtectedRoute><SimuladorConsorcio /></ProtectedRoute>} />
-                <Route path="/relatorios" element={<ProtectedRoute><Relatorios /></ProtectedRoute>} />
-                <Route path="/banners" element={<ProtectedRoute><Banners /></ProtectedRoute>} />
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Suspense>
+            <AuthProvider>
+              <Suspense fallback={<div className="flex items-center justify-center h-screen">Carregando...</div>}>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/dashboard" element={<ProtectedRoute requiredPermission="dashboard"><Dashboard /></ProtectedRoute>} />
+                  <Route path="/financeiro" element={<ProtectedRoute requiredPermission="financeiro"><Financeiro /></ProtectedRoute>} />
+                  <Route path="/contas-pagar" element={<ProtectedRoute requiredPermission="contas_pagar"><ContasPagar /></ProtectedRoute>} />
+                  <Route path="/contas-receber" element={<ProtectedRoute requiredPermission="contas_receber"><ContasReceber /></ProtectedRoute>} />
+                  <Route path="/tasks" element={<ProtectedRoute requiredPermission="tasks"><TasksPage /></ProtectedRoute>} />
+                  <Route path="/leads" element={<ProtectedRoute requiredPermission="leads"><LeadsPage /></ProtectedRoute>} />
+                  <Route path="/atendimentos" element={<ProtectedRoute requiredPermission="atendimentos"><Atendimentos /></ProtectedRoute>} />
+                  <Route path="/clientes" element={<ProtectedRoute requiredPermission="clientes"><Clientes /></ProtectedRoute>} />
+                  <Route path="/produtos" element={<ProtectedRoute requiredPermission="produtos"><Produtos /></ProtectedRoute>} />
+                  <Route path="/agenda" element={<ProtectedRoute requiredPermission="agenda"><Agenda /></ProtectedRoute>} />
+                  <Route path="/simulador" element={<ProtectedRoute requiredPermission="simulador"><SimuladorConsorcio /></ProtectedRoute>} />
+                  <Route path="/relatorios" element={<ProtectedRoute requiredPermission="relatorios"><Relatorios /></ProtectedRoute>} />
+                  <Route path="/banners" element={<ProtectedRoute requiredPermission="banners"><Banners /></ProtectedRoute>} />
+                  <Route path="/admin" element={<ProtectedRoute><Administracao /></ProtectedRoute>} />
+                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </Suspense>
+            </AuthProvider>
           </HashRouter>
         </ErrorBoundary>
       </TooltipProvider>
@@ -81,3 +86,4 @@ const App = () => (
 );
 
 export default App;
+

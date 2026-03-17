@@ -1,14 +1,17 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth, AppPermission } from "@/hooks/useAuth";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
+  requiredPermission?: AppPermission;
 }
 
-export function ProtectedRoute({ children }: ProtectedRouteProps) {
+export function ProtectedRoute({ children, requiredPermission }: ProtectedRouteProps) {
   const navigate = useNavigate();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const { hasPermission, loading, role } = useAuth();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -28,12 +31,24 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  if (isAuthenticated === null) {
+  useEffect(() => {
+    if (!loading && isAuthenticated && requiredPermission && role) {
+      if (!hasPermission(requiredPermission)) {
+        navigate("/dashboard", { replace: true });
+      }
+    }
+  }, [loading, isAuthenticated, requiredPermission, hasPermission, role, navigate]);
+
+  if (isAuthenticated === null || loading) {
     return (
       <div className="flex items-center justify-center h-screen">
         Carregando...
       </div>
     );
+  }
+
+  if (requiredPermission && !hasPermission(requiredPermission)) {
+    return null;
   }
 
   return <>{children}</>;
