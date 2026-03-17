@@ -1,16 +1,12 @@
 import { supabase } from "@/integrations/supabase/client";
 import { TransactionFormData, ParceladoFormData, Transacao } from "../types";
 
-import { transactionFormSchema } from "../schemas";
+import { transactionFormSchema, parceladoFormSchema, updateTransactionSchema } from "../schemas";
 import { handleSupabaseError } from "@/integrations/supabase/error-handler";
 
 export const createTransaction = async (newTransacao: TransactionFormData & { tipo: "receita" | "despesa", created_by?: string }) => {
-    console.log("createTransaction called with:", newTransacao);
-
-    // Validate input using Zod schema
     const validatedData = transactionFormSchema.parse(newTransacao);
 
-    // If created_by is provided (dependency injection), use it, otherwise fetch from supabase
     let userId = newTransacao.created_by;
     if (!userId) {
         const { data: { user } } = await supabase.auth.getUser();
@@ -32,16 +28,12 @@ export const createTransaction = async (newTransacao: TransactionFormData & { ti
         created_by: userId,
         data: new Date().toISOString(),
     };
-    console.log("Sending payload to Supabase:", payload);
 
     const { error } = await supabase.from("transacoes").insert(payload);
     handleSupabaseError(error, "Erro ao criar transação");
 };
 
-import { parceladoFormSchema } from "../schemas";
-
 export const createParceladoTransaction = async (data: ParceladoFormData & { type: "receita" | "despesa", created_by?: string }) => {
-    // Validate input using Zod schema
     const validatedData = parceladoFormSchema.parse(data);
 
     let userId = data.created_by;
@@ -84,9 +76,11 @@ export const createParceladoTransaction = async (data: ParceladoFormData & { typ
 };
 
 export const updateTransaction = async ({ id, ...updates }: Partial<Transacao> & { id: string }) => {
+    const validatedUpdates = updateTransactionSchema.parse(updates);
+
     const { error } = await supabase
         .from("transacoes")
-        .update(updates)
+        .update(validatedUpdates)
         .eq("id", id);
     handleSupabaseError(error, "Erro ao atualizar transação");
 };

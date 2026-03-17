@@ -52,3 +52,19 @@ export const transacaoSchema = z.object({
 export type TransactionFormSchema = z.infer<typeof transactionFormSchema>;
 export type ParceladoFormSchema = z.infer<typeof parceladoFormSchema>;
 export type TransacaoSchema = z.infer<typeof transacaoSchema>;
+
+export const updateTransactionSchema = z.object({
+    descricao: z.string().min(1).optional(),
+    valor: z.number().positive("Valor deve ser positivo").optional(),
+    categoria: z.string().optional(),
+    status: z.enum(["pendente", "pago", "cancelado", "atrasado"]).optional(),
+    data_vencimento: z.string().optional(),
+    data_pagamento: z.string().nullable().optional(),
+    fornecedor_cliente: z.string().optional(),
+    documento: z.string().nullable().optional(),
+    conta_bancaria: z.string().optional(),
+    metodo_pagamento: z.string().nullable().optional(),
+    observacoes: z.string().nullable().optional(),
+    tipo: z.enum(["despesa", "receita"]).optional(),
+}).strict();
+

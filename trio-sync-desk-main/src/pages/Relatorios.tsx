@@ -80,15 +80,21 @@ export default function Relatorios() {
       return;
     }
 
+    const sanitizeCsv = (val: string) => {
+      if (/^[=+\-@\t\r]/.test(val)) return `'${val}`;
+      if (val.includes(",") || val.includes('"')) return `"${val.replace(/"/g, '""')}"`;
+      return val;
+    };
+
     const csv = [
       ["Data", "Cliente", "Tipo", "Status", "Vendedor", "Digitador"],
       ...atendimentos.map((a: RelatorioItem) => [
-        format(new Date(a.created_at), "dd/MM/yyyy"),
-        a.cliente_nome,
-        a.tipo_solicitacao,
-        a.status,
-        a.vendedor?.nome || "-",
-        a.digitador?.nome || "-",
+        sanitizeCsv(format(new Date(a.created_at), "dd/MM/yyyy")),
+        sanitizeCsv(a.cliente_nome || ""),
+        sanitizeCsv(a.tipo_solicitacao || ""),
+        sanitizeCsv(a.status || ""),
+        sanitizeCsv(a.vendedor?.nome || "-"),
+        sanitizeCsv(a.digitador?.nome || "-"),
       ]),
     ]
       .map((row) => row.join(","))

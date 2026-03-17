@@ -1,0 +1,26 @@
+# Ignore entire desktop app directory
+**/trio-sync-desk-main/**
+**/dist-electron-build/**
+**/release-builds/**
+**/_dist-electron-build-temp/**
+**/_release-builds-temp/**
+
+# Ignore build artifacts
+**/*.exe
+**/*.aab
+**/*.apk
+**/*.msi
+**/*.dmg
+
+# Large files
+**/*.zip
+**/*.tar
+**/*.gz
+**/*.rar
+
+# Node modules from other projects
+**/node_modules/
+
+# System files
+**/.DS_Store
+**/Thumbs.db

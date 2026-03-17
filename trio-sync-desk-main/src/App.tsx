@@ -9,6 +9,7 @@ import { RealtimeSyncProvider } from "./components/RealtimeSyncProvider";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { QueryClient } from "@tanstack/react-query";
 import { HashRouter, Routes, Route } from "react-router-dom";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 
 // Lazy-loaded Pages (code splitting)
 const Index = lazy(() => import("./pages/Index"));
@@ -55,19 +56,19 @@ const App = () => (
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/auth" element={<Auth />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/financeiro" element={<Financeiro />} />
-                <Route path="/contas-pagar" element={<ContasPagar />} />
-                <Route path="/contas-receber" element={<ContasReceber />} />
-                <Route path="/tasks" element={<TasksPage />} />
-                <Route path="/leads" element={<LeadsPage />} />
-                <Route path="/atendimentos" element={<Atendimentos />} />
-                <Route path="/clientes" element={<Clientes />} />
-                <Route path="/produtos" element={<Produtos />} />
-                <Route path="/agenda" element={<Agenda />} />
-                <Route path="/simulador" element={<SimuladorConsorcio />} />
-                <Route path="/relatorios" element={<Relatorios />} />
-                <Route path="/banners" element={<Banners />} />
+                <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                <Route path="/financeiro" element={<ProtectedRoute><Financeiro /></ProtectedRoute>} />
+                <Route path="/contas-pagar" element={<ProtectedRoute><ContasPagar /></ProtectedRoute>} />
+                <Route path="/contas-receber" element={<ProtectedRoute><ContasReceber /></ProtectedRoute>} />
+                <Route path="/tasks" element={<ProtectedRoute><TasksPage /></ProtectedRoute>} />
+                <Route path="/leads" element={<ProtectedRoute><LeadsPage /></ProtectedRoute>} />
+                <Route path="/atendimentos" element={<ProtectedRoute><Atendimentos /></ProtectedRoute>} />
+                <Route path="/clientes" element={<ProtectedRoute><Clientes /></ProtectedRoute>} />
+                <Route path="/produtos" element={<ProtectedRoute><Produtos /></ProtectedRoute>} />
+                <Route path="/agenda" element={<ProtectedRoute><Agenda /></ProtectedRoute>} />
+                <Route path="/simulador" element={<ProtectedRoute><SimuladorConsorcio /></ProtectedRoute>} />
+                <Route path="/relatorios" element={<ProtectedRoute><Relatorios /></ProtectedRoute>} />
+                <Route path="/banners" element={<ProtectedRoute><Banners /></ProtectedRoute>} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

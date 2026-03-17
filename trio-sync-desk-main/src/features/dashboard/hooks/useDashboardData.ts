@@ -47,8 +47,6 @@ export function useDashboardData() {
             .filter((t) => t.tipo === "despesa")
             .reduce((acc, t) => acc + Number(t.valor), 0);
 
-        console.log("Dashboard Balance Calculation:", { entradas, saidas, saldo: entradas - saidas });
-
         return { entradas, saidas, saldo: entradas - saidas };
     };
 
