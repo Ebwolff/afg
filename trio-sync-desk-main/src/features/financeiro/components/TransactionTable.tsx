@@ -42,8 +42,10 @@ export function TransactionTable({ transacoes, isLoading, onRegistrarPagamento, 
 
     if (!transacoes || transacoes.length === 0) {
         return (
-            <div className="text-center py-8 text-muted-foreground">
-                Nenhuma conta a pagar encontrada
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                <X className="h-12 w-12 mb-4 opacity-30" />
+                <p className="text-sm font-medium">Nenhuma transação encontrada</p>
+                <p className="text-xs mt-1">Adicione uma nova transação clicando no botão acima.</p>
             </div>
         );
     }
