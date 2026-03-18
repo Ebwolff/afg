@@ -21,26 +21,26 @@ declare global {
   }
 }
 
-// Custom storage adapter
+// Custom storage adapter — sessionStorage para sessão expirar ao fechar o navegador
 const customStorage = {
   getItem: async (key: string): Promise<string | null> => {
     if (window.auth) {
       return await window.auth.getItem(key);
     }
-    return localStorage.getItem(key);
+    return sessionStorage.getItem(key);
   },
   setItem: async (key: string, value: string): Promise<void> => {
     if (window.auth) {
       await window.auth.setItem(key, value);
     } else {
-      localStorage.setItem(key, value);
+      sessionStorage.setItem(key, value);
     }
   },
   removeItem: async (key: string): Promise<void> => {
     if (window.auth) {
       await window.auth.removeItem(key);
     } else {
-      localStorage.removeItem(key);
+      sessionStorage.removeItem(key);
     }
   },
 };
