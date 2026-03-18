@@ -1,6 +1,7 @@
 import { useAuth, AppPermission } from "@/hooks/useAuth";
 
 const ROUTE_MAP: { permission: AppPermission; path: string }[] = [
+  { permission: "agenda", path: "/agenda" },
   { permission: "dashboard", path: "/dashboard" },
   { permission: "leads", path: "/leads" },
   { permission: "tasks", path: "/tasks" },
@@ -11,7 +12,6 @@ const ROUTE_MAP: { permission: AppPermission; path: string }[] = [
   { permission: "contas_receber", path: "/contas-receber" },
   { permission: "financeiro", path: "/financeiro" },
   { permission: "simulador", path: "/simulador" },
-  { permission: "agenda", path: "/agenda" },
   { permission: "relatorios", path: "/relatorios" },
   { permission: "banners", path: "/banners" },
 ];
@@ -19,9 +19,9 @@ const ROUTE_MAP: { permission: AppPermission; path: string }[] = [
 export function useFirstPermittedRoute(): string {
   const { hasPermission, isAdmin, loading } = useAuth();
 
-  if (loading) return "/dashboard";
-  if (isAdmin) return "/dashboard";
+  if (loading) return "/produtividade";
+  if (isAdmin) return "/produtividade";
 
   const first = ROUTE_MAP.find((r) => hasPermission(r.permission));
-  return first?.path || "/dashboard";
+  return first?.path || "/agenda";
 }
