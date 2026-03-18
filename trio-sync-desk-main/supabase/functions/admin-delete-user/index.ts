@@ -77,8 +77,8 @@ serve(async (req) => {
       { table: "atendimentos", col: "digitador_id" },
       { table: "transacoes", col: "created_by" },
       { table: "eventos", col: "created_by" },
-      { table: "tarefas", col: "assigned_to" },
-      { table: "tarefas", col: "created_by" },
+      { table: "tasks", col: "assigned_to" },
+      { table: "tasks", col: "created_by" },
       // FKs que referenciam auth.users(id)
       { table: "produtos", col: "created_by" },
       { table: "simulacoes_consorcio", col: "created_by" },
