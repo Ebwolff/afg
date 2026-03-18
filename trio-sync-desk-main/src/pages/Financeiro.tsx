@@ -26,6 +26,7 @@ import { createTransaction, deleteTransaction } from "@/features/financeiro/api/
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { TransactionSkeleton } from "@/components/skeletons/TransactionSkeleton";
+import { useHideValues } from "@/hooks/useHideValues";
 
 const CATEGORIAS_RECEITA = [
   "Vendas",
@@ -52,6 +53,7 @@ export default function Financeiro() {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { mask } = useHideValues();
 
   const [formData, setFormData] = useState({
     tipo: "receita" as "receita" | "despesa",
@@ -256,8 +258,7 @@ export default function Financeiro() {
                         : "text-destructive"
                         }`}
                     >
-                      {transacao.tipo === "receita" ? "+" : "-"}R${" "}
-                      {Number(transacao.valor).toFixed(2)}
+                      {transacao.tipo === "receita" ? "+" : "-"}{mask(Number(transacao.valor))}
                     </div>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>

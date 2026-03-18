@@ -13,6 +13,7 @@ import {
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Produto } from "../types";
+import { useHideValues } from "@/hooks/useHideValues";
 
 interface ProdutoListProps {
     produtos: Produto[] | undefined;
@@ -20,6 +21,7 @@ interface ProdutoListProps {
 }
 
 export function ProdutoList({ produtos, onDelete }: ProdutoListProps) {
+    const { mask } = useHideValues();
     const getCategoriaIcon = (categoria: string) => {
         switch (categoria) {
             case "cartas_credito":
@@ -111,7 +113,7 @@ export function ProdutoList({ produtos, onDelete }: ProdutoListProps) {
                             </span>
                             {produto.valor_base && (
                                 <span className="px-2 py-1 rounded-md bg-primary/10 text-primary font-medium">
-                                    R$ {typeof produto.valor_base === 'number' ? produto.valor_base.toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : parseFloat(produto.valor_base).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                                    {mask(typeof produto.valor_base === 'number' ? produto.valor_base : parseFloat(produto.valor_base))}
                                 </span>
                             )}
                             {produto.comissao_percentual && (

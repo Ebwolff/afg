@@ -7,6 +7,7 @@ import { Check, X, Trash2, Pencil } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Transacao } from "../types";
+import { useHideValues } from "@/hooks/useHideValues";
 
 interface TransactionTableProps {
     transacoes: Transacao[] | undefined;
@@ -18,6 +19,7 @@ interface TransactionTableProps {
 }
 
 export function TransactionTable({ transacoes, isLoading, onRegistrarPagamento, onCancelar, onDelete, onEdit }: TransactionTableProps) {
+    const { mask } = useHideValues();
     const getStatusBadge = (status: string) => {
         const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
             pendente: "secondary",
@@ -72,7 +74,7 @@ export function TransactionTable({ transacoes, isLoading, onRegistrarPagamento, 
                         <TableCell>{transacao.fornecedor_cliente || "-"}</TableCell>
                         <TableCell>{transacao.descricao}</TableCell>
                         <TableCell>
-                            {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(transacao.valor || 0))}
+                            {mask(Number(transacao.valor || 0))}
                         </TableCell>
                         <TableCell>{getStatusBadge(transacao.status)}</TableCell>
                         <TableCell>

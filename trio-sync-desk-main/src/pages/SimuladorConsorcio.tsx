@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { jsPDF } from "jspdf";
 import logoImg from "@/assets/logo.jpg";
+import { useHideValues } from "@/hooks/useHideValues";
 
 export default function SimuladorConsorcio() {
   const [clienteNome, setClienteNome] = useState("");
@@ -20,6 +21,7 @@ export default function SimuladorConsorcio() {
   const [valorParcela, setValorParcela] = useState("");
   const [valorParcelaReduzida, setValorParcelaReduzida] = useState("");
   const [observacoes, setObservacoes] = useState("");
+  const { mask } = useHideValues();
 
   const salvarSimulacao = async () => {
     if (!clienteNome || !tipoBem || !valorCarta || !prazoMeses) {
@@ -477,7 +479,7 @@ export default function SimuladorConsorcio() {
                     <div className="flex justify-between items-center p-4 bg-primary/10 rounded-lg border border-primary/20">
                       <span className="text-sm font-medium text-primary">Parcela Cheia</span>
                       <span className="text-2xl font-bold text-primary">
-                        R$ {parseFloat(valorParcela).toFixed(2)}
+                        {mask(parseFloat(valorParcela))}
                       </span>
                     </div>
 
@@ -487,7 +489,7 @@ export default function SimuladorConsorcio() {
                           Parcela com Redução (até contemplação)
                         </span>
                         <span className="text-2xl font-bold text-[#0f572d]">
-                          R$ {parseFloat(valorParcelaReduzida).toFixed(2)}
+                          {mask(parseFloat(valorParcelaReduzida))}
                         </span>
                       </div>
                     )}
@@ -496,7 +498,7 @@ export default function SimuladorConsorcio() {
                   <div className="space-y-2">
                     <div className="flex justify-between p-3 border-b">
                       <span className="text-sm text-muted-foreground">Valor da Carta</span>
-                      <span className="font-medium">R$ {parseFloat(valorCarta || "0").toFixed(2)}</span>
+                      <span className="font-medium">{mask(parseFloat(valorCarta || "0"))}</span>
                     </div>
                     <div className="flex justify-between p-3 border-b">
                       <span className="text-sm text-muted-foreground">Prazo</span>
