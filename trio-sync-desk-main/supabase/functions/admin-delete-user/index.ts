@@ -22,11 +22,9 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
-    // Admin client (bypasses RLS)
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-    // Verificar caller via JWT
+    // Verificar caller
     const token = authHeader.replace("Bearer ", "");
     const { data: { user: caller }, error: authError } = await adminClient.auth.getUser(token);
 
@@ -37,7 +35,7 @@ serve(async (req) => {
       });
     }
 
-    // Verificar se é admin (via adminClient - bypasses RLS)
+    // Verificar admin
     const { data: roleData } = await adminClient
       .from("user_roles")
       .select("role")
@@ -61,7 +59,6 @@ serve(async (req) => {
       });
     }
 
-    // Impedir auto-exclusão
     if (userId === caller.id) {
       return new Response(JSON.stringify({ error: "Você não pode excluir a si mesmo" }), {
         status: 200,
@@ -69,13 +66,25 @@ serve(async (req) => {
       });
     }
 
-    // Remover role
+    // 1. Limpar FK references que apontam para profiles(id)
+    // clientes.created_by
+    await adminClient.from("clientes").update({ created_by: null }).eq("created_by", userId);
+    // servicos.atendido_por
+    await adminClient.from("servicos").update({ atendido_por: null }).eq("atendido_por", userId);
+    // atendimentos (3 colunas)
+    await adminClient.from("atendimentos").update({ solicitado_por: null }).eq("solicitado_por", userId);
+    await adminClient.from("atendimentos").update({ atendido_por: null }).eq("atendido_por", userId);
+    await adminClient.from("atendimentos").update({ vendedor_id: null }).eq("vendedor_id", userId);
+    await adminClient.from("atendimentos").update({ digitador_id: null }).eq("digitador_id", userId);
+    // transacoes.created_by
+    await adminClient.from("transacoes").update({ created_by: null }).eq("created_by", userId);
+    // eventos.created_by
+    await adminClient.from("eventos").update({ created_by: null }).eq("created_by", userId);
+
+    // 2. Remover user_roles (will also cascade via auth.users FK, but explicit is safer)
     await adminClient.from("user_roles").delete().eq("user_id", userId);
 
-    // Remover profile
-    await adminClient.from("profiles").delete().eq("id", userId);
-
-    // Remover usuário do Auth
+    // 3. Deletar de auth.users (cascades to profiles via ON DELETE CASCADE)
     const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
     if (deleteError) {
       return new Response(JSON.stringify({ error: deleteError.message }), {
