@@ -2,8 +2,6 @@ import { useState, useEffect, useCallback, createContext, useContext } from "rea
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 
-export type AppRole = "admin" | "servicos";
-
 export type AppPermission =
   | "dashboard"
   | "leads"
@@ -37,16 +35,28 @@ export const ALL_PERMISSIONS: { id: AppPermission; label: string }[] = [
   { id: "banners", label: "Banners" },
 ];
 
+export interface CustomRole {
+  id: string;
+  name: string;
+  display_name: string;
+  description: string | null;
+  permissions: string[];
+  is_system: boolean;
+}
+
 interface AuthState {
   user: User | null;
-  profile: { id: string; nome: string; email: string; permissions: AppPermission[] } | null;
-  role: AppRole | null;
+  profile: { id: string; nome: string; email: string } | null;
+  role: CustomRole | null;
   loading: boolean;
 }
 
 interface AuthContextType extends AuthState {
   hasPermission: (permission: AppPermission) => boolean;
   isAdmin: boolean;
+  roleName: string;
+  roleDisplayName: string;
+  permissions: AppPermission[];
   refresh: () => Promise<void>;
 }
 
@@ -61,25 +71,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   const fetchUserData = useCallback(async (user: User) => {
+    // Query 1: Profile
     const { data: profile } = await supabase
       .from("profiles")
-      .select("id, nome, email, permissions")
+      .select("id, nome, email")
       .eq("id", user.id)
       .single();
 
-    const { data: roleData } = await supabase
+    // Query 2: Role via JOIN user_roles → custom_roles
+    // Fallback: se role_id não existe ainda, busca pelo campo string 'role'
+    const { data: roleJoin } = await supabase
       .from("user_roles")
-      .select("role")
+      .select("role_id, role, custom_role:role_id(id, name, display_name, description, permissions, is_system)")
       .eq("user_id", user.id)
       .single();
 
-    const role = (roleData?.role as AppRole) || "servicos";
-    const permissions = (profile?.permissions as AppPermission[]) || [];
+    let resolvedRole: CustomRole | null = null;
+
+    if (roleJoin?.custom_role && !Array.isArray(roleJoin.custom_role)) {
+      // Novo sistema: role_id populado
+      resolvedRole = roleJoin.custom_role as unknown as CustomRole;
+    } else if (roleJoin?.role) {
+      // Fallback: buscar pelo nome da role (sistema antigo)
+      const { data: fallbackRole } = await supabase
+        .from("custom_roles")
+        .select("id, name, display_name, description, permissions, is_system")
+        .eq("name", roleJoin.role)
+        .single();
+      resolvedRole = (fallbackRole as CustomRole) || null;
+    }
 
     setState({
       user,
-      profile: profile ? { ...profile, permissions } : null,
-      role,
+      profile: profile ? { id: profile.id, nome: profile.nome, email: profile.email } : null,
+      role: resolvedRole,
       loading: false,
     });
   }, []);
@@ -111,18 +136,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, [fetchUserData]);
 
+  const isAdmin = state.role?.name === "admin";
+
+  const permissions = (state.role?.permissions || []) as AppPermission[];
+
   const hasPermission = useCallback(
     (permission: AppPermission) => {
-      if (state.role === "admin") return true;
-      return state.profile?.permissions?.includes(permission) ?? false;
+      if (isAdmin) return true;
+      return permissions.includes(permission);
     },
-    [state.role, state.profile?.permissions]
+    [isAdmin, permissions]
   );
 
   const value: AuthContextType = {
     ...state,
     hasPermission,
-    isAdmin: state.role === "admin",
+    isAdmin,
+    roleName: state.role?.name || "servicos",
+    roleDisplayName: state.role?.display_name || "Serviços",
+    permissions,
     refresh,
   };
 
@@ -140,3 +172,6 @@ export function useAuth() {
   }
   return context;
 }
+
+// Backward compatibility: keep AppRole type for Edge Functions
+export type AppRole = string;

@@ -12,16 +12,18 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth, ALL_PERMISSIONS, AppPermission, AppRole } from "@/hooks/useAuth";
+import { useAuth, ALL_PERMISSIONS, AppPermission, CustomRole } from "@/hooks/useAuth";
 import { UserPlus, Shield, Settings2, Loader2, Pencil, Trash2 } from "lucide-react";
 
 interface UserProfile {
   id: string;
   nome: string;
   email: string;
-  permissions: AppPermission[] | null;
   created_at: string;
-  role?: AppRole;
+  role_id: string | null;
+  role_name: string;
+  role_display_name: string;
+  role_permissions: string[];
 }
 
 export default function Administracao() {
@@ -31,33 +33,57 @@ export default function Administracao() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [permDialogOpen, setPermDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
-  const [selectedPermissions, setSelectedPermissions] = useState<AppPermission[]>([]);
-  const [newUser, setNewUser] = useState({ nome: "", email: "", password: "", role: "servicos" as AppRole });
+  const [selectedRoleId, setSelectedRoleId] = useState<string>("");
+  const [newUser, setNewUser] = useState({ nome: "", email: "", password: "", role: "" });
   const [creatingUser, setCreatingUser] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editUser, setEditUser] = useState<{ id: string; nome: string; role: AppRole } | null>(null);
+  const [editUser, setEditUser] = useState<{ id: string; nome: string; roleId: string } | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
+  // Buscar roles dinâmicas
+  const { data: customRoles } = useQuery({
+    queryKey: ["custom-roles"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("custom_roles")
+        .select("*")
+        .order("name");
+      if (error) throw error;
+      return (data || []) as CustomRole[];
+    },
+    enabled: isAdmin,
+  });
+
+  // Buscar usuários com role via JOIN
   const { data: users, isLoading } = useQuery({
     queryKey: ["admin-users"],
     queryFn: async () => {
       const { data: profiles, error } = await supabase
         .from("profiles")
-        .select("*")
+        .select("id, nome, email, created_at")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
 
       const { data: roles } = await supabase
         .from("user_roles")
-        .select("user_id, role");
+        .select("user_id, role_id, role, custom_role:role_id(id, name, display_name, permissions)");
 
-      const rolesMap = new Map(roles?.map((r) => [r.user_id, r.role as AppRole]) || []);
+      const rolesMap = new Map<string, { role_id: string | null; role_name: string; role_display_name: string; role_permissions: string[] }>();
+
+      roles?.forEach((r) => {
+        const cr = r.custom_role && !Array.isArray(r.custom_role) ? r.custom_role : null;
+        rolesMap.set(r.user_id, {
+          role_id: cr?.id || null,
+          role_name: cr?.name || r.role || "servicos",
+          role_display_name: cr?.display_name || (r.role === "admin" ? "Administrador" : "Serviços"),
+          role_permissions: (cr?.permissions as string[]) || [],
+        });
+      });
 
       return (profiles || []).map((p) => ({
         ...p,
-        permissions: (p.permissions as AppPermission[]) || [],
-        role: rolesMap.get(p.id) || ("servicos" as AppRole),
+        ...rolesMap.get(p.id) || { role_id: null, role_name: "servicos", role_display_name: "Serviços", role_permissions: [] },
       })) as UserProfile[];
     },
     enabled: isAdmin,
@@ -71,7 +97,8 @@ export default function Administracao() {
           email: newUser.email,
           password: newUser.password,
           nome: newUser.nome,
-          role: newUser.role,
+          role: newUser.role || "servicos",
+          roleId: newUser.role, // Envia o role_id
         },
       });
 
@@ -80,7 +107,7 @@ export default function Administracao() {
 
       toast({ title: "Usuário criado com sucesso!" });
       setCreateDialogOpen(false);
-      setNewUser({ nome: "", email: "", password: "", role: "servicos" });
+      setNewUser({ nome: "", email: "", password: "", role: "" });
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
     } catch (err: unknown) {
       const error = err as Error;
@@ -90,58 +117,33 @@ export default function Administracao() {
     }
   };
 
-  const updatePermissions = useMutation({
-    mutationFn: async ({ userId, permissions }: { userId: string; permissions: AppPermission[] }) => {
+  // Alterar role do usuário
+  const updateUserRole = useMutation({
+    mutationFn: async ({ userId, roleId }: { userId: string; roleId: string }) => {
+      // Encontrar a role para pegar o name (necessário para o campo legacy)
+      const role = customRoles?.find((r) => r.id === roleId);
+      if (!role) throw new Error("Role não encontrada");
+
       const { error } = await supabase
-        .from("profiles")
-        .update({ permissions })
-        .eq("id", userId);
+        .from("user_roles")
+        .update({ role_id: roleId, role: role.name })
+        .eq("user_id", userId);
       if (error) throw error;
     },
     onSuccess: () => {
-      toast({ title: "Permissões atualizadas!" });
-      setPermDialogOpen(false);
-      setSelectedUser(null);
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Erro ao atualizar permissões", description: error.message, variant: "destructive" });
     },
   });
 
-  const openPermissionsDialog = (user: UserProfile) => {
-    setSelectedUser(user);
-    setSelectedPermissions(user.permissions || []);
-    setPermDialogOpen(true);
-  };
-
-  const togglePermission = (permId: AppPermission) => {
-    setSelectedPermissions((prev) =>
-      prev.includes(permId) ? prev.filter((p) => p !== permId) : [...prev, permId]
-    );
-  };
-
-  const selectAll = () => setSelectedPermissions(ALL_PERMISSIONS.map((p) => p.id));
-  const deselectAll = () => setSelectedPermissions([]);
-
   const updateUser = useMutation({
-    mutationFn: async ({ id, nome, role }: { id: string; nome: string; role: AppRole }) => {
+    mutationFn: async ({ id, nome, roleId }: { id: string; nome: string; roleId: string }) => {
       const { error: profileError } = await supabase
         .from("profiles")
         .update({ nome })
         .eq("id", id);
       if (profileError) throw profileError;
 
-      const { error: deleteRoleError } = await supabase
-        .from("user_roles")
-        .delete()
-        .eq("user_id", id);
-      if (deleteRoleError) throw deleteRoleError;
-
-      const { error: insertRoleError } = await supabase
-        .from("user_roles")
-        .insert({ user_id: id, role });
-      if (insertRoleError) throw insertRoleError;
+      await updateUserRole.mutateAsync({ userId: id, roleId });
     },
     onSuccess: () => {
       toast({ title: "Usuário atualizado!" });
@@ -159,7 +161,6 @@ export default function Administracao() {
       const { data, error } = await supabase.functions.invoke("admin-delete-user", {
         body: { userId },
       });
-
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
     },
@@ -174,8 +175,24 @@ export default function Administracao() {
   });
 
   const openEditDialog = (user: UserProfile) => {
-    setEditUser({ id: user.id, nome: user.nome, role: user.role || "servicos" });
+    setEditUser({ id: user.id, nome: user.nome, roleId: user.role_id || "" });
     setEditDialogOpen(true);
+  };
+
+  const openPermissionsDialog = (user: UserProfile) => {
+    setSelectedUser(user);
+    setSelectedRoleId(user.role_id || "");
+    setPermDialogOpen(true);
+  };
+
+  const getRoleBadgeVariant = (roleName: string) => {
+    switch (roleName) {
+      case "admin": return "default" as const;
+      case "gerente": return "default" as const;
+      case "vendedor": return "secondary" as const;
+      case "financeiro": return "outline" as const;
+      default: return "secondary" as const;
+    }
   };
 
   if (!isAdmin) {
@@ -187,6 +204,8 @@ export default function Administracao() {
       </Layout>
     );
   }
+
+  const defaultRoleId = customRoles?.find((r) => r.name === "servicos")?.id || "";
 
   return (
     <Layout>
@@ -245,15 +264,18 @@ export default function Administracao() {
                 <div className="space-y-2">
                   <Label>Perfil</Label>
                   <Select
-                    value={newUser.role}
-                    onValueChange={(value: AppRole) => setNewUser({ ...newUser, role: value })}
+                    value={newUser.role || defaultRoleId}
+                    onValueChange={(value) => setNewUser({ ...newUser, role: value })}
                   >
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Selecione o perfil" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="admin">Administrador</SelectItem>
-                      <SelectItem value="servicos">Serviços</SelectItem>
+                      {customRoles?.map((role) => (
+                        <SelectItem key={role.id} value={role.id}>
+                          {role.display_name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -296,16 +318,16 @@ export default function Administracao() {
                       <TableCell className="font-medium">{user.nome}</TableCell>
                       <TableCell>{user.email}</TableCell>
                       <TableCell>
-                        <Badge variant={user.role === "admin" ? "default" : "secondary"}>
-                          {user.role === "admin" ? "Administrador" : "Serviços"}
+                        <Badge variant={getRoleBadgeVariant(user.role_name)}>
+                          {user.role_display_name}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {user.role === "admin" ? (
+                        {user.role_name === "admin" ? (
                           <span className="text-sm text-muted-foreground">Acesso total</span>
                         ) : (
                           <span className="text-sm text-muted-foreground">
-                            {user.permissions?.length || 0} módulo(s)
+                            {user.role_permissions?.length || 0} módulo(s)
                           </span>
                         )}
                       </TableCell>
@@ -319,7 +341,7 @@ export default function Administracao() {
                             <Pencil className="mr-1 h-4 w-4" />
                             Editar
                           </Button>
-                          {user.role !== "admin" && (
+                          {user.role_name !== "admin" && (
                             <Button
                               variant="outline"
                               size="sm"
@@ -347,53 +369,88 @@ export default function Administracao() {
           </CardContent>
         </Card>
 
+        {/* Dialog: Visualizar Permissões da Role */}
         <Dialog open={permDialogOpen} onOpenChange={setPermDialogOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Permissões — {selectedUser?.nome}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={selectAll}>
-                  Selecionar Todos
-                </Button>
-                <Button variant="outline" size="sm" onClick={deselectAll}>
-                  Desmarcar Todos
-                </Button>
+              <div className="space-y-2">
+                <Label>Alterar Perfil</Label>
+                <Select
+                  value={selectedRoleId}
+                  onValueChange={setSelectedRoleId}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o perfil" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {customRoles?.map((role) => (
+                      <SelectItem key={role.id} value={role.id}>
+                        {role.display_name}
+                        {role.description && (
+                          <span className="text-xs text-muted-foreground ml-2">— {role.description}</span>
+                        )}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="grid grid-cols-1 gap-3 max-h-80 overflow-y-auto">
-                {ALL_PERMISSIONS.map((perm) => (
-                  <label
-                    key={perm.id}
-                    className="flex items-center space-x-3 rounded-lg border p-3 cursor-pointer hover:bg-accent/50 transition-colors"
-                  >
-                    <Checkbox
-                      checked={selectedPermissions.includes(perm.id)}
-                      onCheckedChange={() => togglePermission(perm.id)}
-                    />
-                    <span className="text-sm font-medium">{perm.label}</span>
-                  </label>
-                ))}
-              </div>
+
+              {/* Preview de permissões da role selecionada */}
+              {selectedRoleId && (
+                <div className="space-y-2">
+                  <Label className="text-sm text-muted-foreground">Módulos incluídos neste perfil:</Label>
+                  <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto">
+                    {ALL_PERMISSIONS.map((perm) => {
+                      const role = customRoles?.find((r) => r.id === selectedRoleId);
+                      const included = role?.permissions?.includes(perm.id) || false;
+                      return (
+                        <div
+                          key={perm.id}
+                          className={`flex items-center space-x-3 rounded-lg border p-2.5 ${
+                            included ? "bg-primary/5 border-primary/20" : "opacity-40"
+                          }`}
+                        >
+                          <Checkbox checked={included} disabled />
+                          <span className="text-sm">{perm.label}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <Button
                 className="w-full"
                 onClick={() => {
-                  if (selectedUser) {
-                    updatePermissions.mutate({
-                      userId: selectedUser.id,
-                      permissions: selectedPermissions,
-                    });
+                  if (selectedUser && selectedRoleId) {
+                    updateUserRole.mutate(
+                      { userId: selectedUser.id, roleId: selectedRoleId },
+                      {
+                        onSuccess: () => {
+                          toast({ title: "Perfil atualizado!" });
+                          setPermDialogOpen(false);
+                          setSelectedUser(null);
+                        },
+                        onError: (error) => {
+                          toast({ title: "Erro ao atualizar perfil", description: error.message, variant: "destructive" });
+                        },
+                      }
+                    );
                   }
                 }}
-                disabled={updatePermissions.isPending}
+                disabled={updateUserRole.isPending || !selectedRoleId}
               >
-                {updatePermissions.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Salvar Permissões
+                {updateUserRole.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Salvar Perfil
               </Button>
             </div>
           </DialogContent>
         </Dialog>
 
+        {/* Dialog: Editar Usuário */}
         <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
           <DialogContent>
             <DialogHeader>
@@ -418,15 +475,18 @@ export default function Administracao() {
                 <div className="space-y-2">
                   <Label>Perfil</Label>
                   <Select
-                    value={editUser.role}
-                    onValueChange={(value: AppRole) => setEditUser({ ...editUser, role: value })}
+                    value={editUser.roleId}
+                    onValueChange={(value) => setEditUser({ ...editUser, roleId: value })}
                   >
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Selecione o perfil" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="admin">Administrador</SelectItem>
-                      <SelectItem value="servicos">Serviços</SelectItem>
+                      {customRoles?.map((role) => (
+                        <SelectItem key={role.id} value={role.id}>
+                          {role.display_name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -439,6 +499,7 @@ export default function Administracao() {
           </DialogContent>
         </Dialog>
 
+        {/* Dialog: Confirmar Exclusão */}
         <Dialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}>
           <DialogContent>
             <DialogHeader>

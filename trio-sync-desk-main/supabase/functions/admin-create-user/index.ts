@@ -22,11 +22,8 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
-    // Admin client (bypasses RLS)
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-    // Verificar caller via JWT
     const token = authHeader.replace("Bearer ", "");
     const { data: { user: caller }, error: authError } = await adminClient.auth.getUser(token);
 
@@ -37,14 +34,15 @@ serve(async (req) => {
       });
     }
 
-    // Verificar se é admin (via adminClient - bypasses RLS)
-    const { data: roleData } = await adminClient
+    // Verificar admin via custom_roles JOIN
+    const { data: callerRole } = await adminClient
       .from("user_roles")
-      .select("role")
+      .select("role, role_id, custom_role:role_id(name)")
       .eq("user_id", caller.id)
       .single();
 
-    if (roleData?.role !== "admin") {
+    const callerRoleName = callerRole?.custom_role?.name || callerRole?.role;
+    if (callerRoleName !== "admin") {
       return new Response(JSON.stringify({ error: "Acesso restrito a administradores" }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -52,13 +50,40 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { email, password, nome, role } = body;
+    const { email, password, nome, role, roleId } = body;
 
     if (!email || !password || !nome) {
       return new Response(JSON.stringify({ error: "Email, senha e nome são obrigatórios" }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Resolver role_id: se veio roleId direto, usar; senão buscar por nome
+    let resolvedRoleId = roleId || null;
+    let resolvedRoleName = role || "servicos";
+
+    if (resolvedRoleId) {
+      // roleId é na verdade o UUID da custom_roles
+      const { data: cr } = await adminClient
+        .from("custom_roles")
+        .select("id, name")
+        .eq("id", resolvedRoleId)
+        .single();
+      if (cr) {
+        resolvedRoleName = cr.name;
+        resolvedRoleId = cr.id;
+      }
+    } else if (resolvedRoleName) {
+      // Buscar por nome
+      const { data: cr } = await adminClient
+        .from("custom_roles")
+        .select("id, name")
+        .eq("name", resolvedRoleName)
+        .single();
+      if (cr) {
+        resolvedRoleId = cr.id;
+      }
     }
 
     // Criar usuário via admin API
@@ -83,19 +108,12 @@ serve(async (req) => {
         .update({ nome })
         .eq("id", newUser.user.id);
 
-      // Inserir role
+      // Inserir role com role_id
       await adminClient.from("user_roles").insert({
         user_id: newUser.user.id,
-        role: role || "servicos",
+        role: resolvedRoleName,
+        role_id: resolvedRoleId,
       });
-
-      // Permissões padrão
-      if (role === "servicos" || !role) {
-        await adminClient
-          .from("profiles")
-          .update({ permissions: ["dashboard"] })
-          .eq("id", newUser.user.id);
-      }
     }
 
     return new Response(JSON.stringify({ success: true, user: newUser?.user }), {
