@@ -30,7 +30,7 @@ export default function Dashboard() {
 
   return (
     <Layout>
-      <div className="space-y-6">
+      <div className="space-y-6 page-enter">
         <div>
           <h1 className="text-3xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground">
@@ -49,7 +49,7 @@ export default function Dashboard() {
           ticketMedio={ticketMedio}
         />
 
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid gap-4 lg:grid-cols-3 page-enter" style={{ animationDelay: '150ms' }}>
           <div className="lg:col-span-2">
             <DashboardCharts
               loading={loading}

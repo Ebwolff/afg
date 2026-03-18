@@ -6,11 +6,11 @@ export function DashboardSkeleton() {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <Skeleton className="h-9 w-48" />
-                <Skeleton className="h-10 w-32" />
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                {[1, 2, 3, 4].map((i) => (
+            {/* 8 KPI cards */}
+            <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+                {Array.from({ length: 8 }).map((_, i) => (
                     <Card key={i}>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                             <CardTitle className="text-sm font-medium">
@@ -26,32 +26,44 @@ export function DashboardSkeleton() {
                 ))}
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-                <Card className="col-span-4">
+            {/* Charts + Ranking */}
+            <div className="grid gap-4 lg:grid-cols-3">
+                <div className="lg:col-span-2 space-y-4">
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <Card>
+                            <CardHeader>
+                                <Skeleton className="h-6 w-40" />
+                            </CardHeader>
+                            <CardContent>
+                                <Skeleton className="h-[300px] w-full" />
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader>
+                                <Skeleton className="h-6 w-32" />
+                            </CardHeader>
+                            <CardContent>
+                                <Skeleton className="h-[300px] w-full" />
+                            </CardContent>
+                        </Card>
+                    </div>
+                    <Card>
+                        <CardHeader>
+                            <Skeleton className="h-6 w-48" />
+                        </CardHeader>
+                        <CardContent>
+                            <Skeleton className="h-[250px] w-full" />
+                        </CardContent>
+                    </Card>
+                </div>
+                <Card>
                     <CardHeader>
-                        <CardTitle><Skeleton className="h-6 w-32" /></CardTitle>
-                    </CardHeader>
-                    <CardContent className="pl-2">
-                        <Skeleton className="h-[350px] w-full" />
-                    </CardContent>
-                </Card>
-                <Card className="col-span-3">
-                    <CardHeader>
-                        <CardTitle><Skeleton className="h-6 w-32" /></CardTitle>
+                        <Skeleton className="h-6 w-40" />
                     </CardHeader>
                     <CardContent>
-                        <div className="space-y-8">
+                        <div className="space-y-3">
                             {[1, 2, 3, 4, 5].map((i) => (
-                                <div key={i} className="flex items-center">
-                                    <Skeleton className="h-9 w-9 rounded-full" />
-                                    <div className="ml-4 space-y-1">
-                                        <Skeleton className="h-4 w-32" />
-                                        <Skeleton className="h-3 w-24" />
-                                    </div>
-                                    <div className="ml-auto font-medium">
-                                        <Skeleton className="h-4 w-16" />
-                                    </div>
-                                </div>
+                                <Skeleton key={i} className="h-12 w-full rounded-lg" />
                             ))}
                         </div>
                     </CardContent>
