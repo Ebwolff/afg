@@ -39,6 +39,7 @@ export default function Administracao() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editUser, setEditUser] = useState<{ id: string; nome: string; roleId: string } | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
 
   // Buscar roles dinâmicas
   const { data: customRoles } = useQuery({
@@ -182,6 +183,7 @@ export default function Administracao() {
   const openPermissionsDialog = (user: UserProfile) => {
     setSelectedUser(user);
     setSelectedRoleId(user.role_id || "");
+    setSelectedPermissions(user.role_permissions || []);
     setPermDialogOpen(true);
   };
 
@@ -369,7 +371,7 @@ export default function Administracao() {
           </CardContent>
         </Card>
 
-        {/* Dialog: Visualizar Permissões da Role */}
+        {/* Dialog: Permissões Editáveis */}
         <Dialog open={permDialogOpen} onOpenChange={setPermDialogOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>
@@ -380,7 +382,12 @@ export default function Administracao() {
                 <Label>Alterar Perfil</Label>
                 <Select
                   value={selectedRoleId}
-                  onValueChange={setSelectedRoleId}
+                  onValueChange={(value) => {
+                    setSelectedRoleId(value);
+                    // Preencher permissões da role selecionada
+                    const role = customRoles?.find((r) => r.id === value);
+                    setSelectedPermissions((role?.permissions as string[]) || []);
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione o perfil" />
@@ -398,47 +405,87 @@ export default function Administracao() {
                 </Select>
               </div>
 
-              {/* Preview de permissões da role selecionada */}
-              {selectedRoleId && (
-                <div className="space-y-2">
-                  <Label className="text-sm text-muted-foreground">Módulos incluídos neste perfil:</Label>
-                  <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto">
-                    {ALL_PERMISSIONS.map((perm) => {
-                      const role = customRoles?.find((r) => r.id === selectedRoleId);
-                      const included = role?.permissions?.includes(perm.id) || false;
-                      return (
-                        <div
-                          key={perm.id}
-                          className={`flex items-center space-x-3 rounded-lg border p-2.5 ${
-                            included ? "bg-primary/5 border-primary/20" : "opacity-40"
-                          }`}
-                        >
-                          <Checkbox checked={included} disabled />
-                          <span className="text-sm">{perm.label}</span>
-                        </div>
-                      );
-                    })}
+              {/* Permissões editáveis */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm">Módulos com acesso:</Label>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => setSelectedPermissions(ALL_PERMISSIONS.map((p) => p.id))}
+                    >
+                      Todos
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => setSelectedPermissions([])}
+                    >
+                      Nenhum
+                    </Button>
                   </div>
                 </div>
-              )}
+                <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto">
+                  {ALL_PERMISSIONS.map((perm) => {
+                    const included = selectedPermissions.includes(perm.id);
+                    return (
+                      <div
+                        key={perm.id}
+                        className={`flex items-center space-x-3 rounded-lg border p-2.5 cursor-pointer transition-colors ${
+                          included ? "bg-primary/5 border-primary/20" : "hover:bg-muted/50"
+                        }`}
+                        onClick={() => {
+                          setSelectedPermissions((prev) =>
+                            included
+                              ? prev.filter((p) => p !== perm.id)
+                              : [...prev, perm.id]
+                          );
+                        }}
+                      >
+                        <Checkbox
+                          checked={included}
+                          onCheckedChange={(checked) => {
+                            setSelectedPermissions((prev) =>
+                              checked
+                                ? [...prev, perm.id]
+                                : prev.filter((p) => p !== perm.id)
+                            );
+                          }}
+                        />
+                        <span className="text-sm">{perm.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
 
               <Button
                 className="w-full"
-                onClick={() => {
+                onClick={async () => {
                   if (selectedUser && selectedRoleId) {
-                    updateUserRole.mutate(
-                      { userId: selectedUser.id, roleId: selectedRoleId },
-                      {
-                        onSuccess: () => {
-                          toast({ title: "Perfil atualizado!" });
-                          setPermDialogOpen(false);
-                          setSelectedUser(null);
-                        },
-                        onError: (error) => {
-                          toast({ title: "Erro ao atualizar perfil", description: error.message, variant: "destructive" });
-                        },
-                      }
-                    );
+                    try {
+                      // 1. Atualizar role do usuário
+                      await updateUserRole.mutateAsync({ userId: selectedUser.id, roleId: selectedRoleId });
+
+                      // 2. Atualizar permissões da role
+                      const { error } = await supabase
+                        .from("custom_roles")
+                        .update({ permissions: selectedPermissions })
+                        .eq("id", selectedRoleId);
+                      if (error) throw error;
+
+                      toast({ title: "Permissões atualizadas!" });
+                      setPermDialogOpen(false);
+                      setSelectedUser(null);
+                      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+                      queryClient.invalidateQueries({ queryKey: ["custom-roles"] });
+                    } catch (err: unknown) {
+                      const error = err as Error;
+                      toast({ title: "Erro ao atualizar", description: error.message, variant: "destructive" });
+                    }
                   }
                 }}
                 disabled={updateUserRole.isPending || !selectedRoleId}
