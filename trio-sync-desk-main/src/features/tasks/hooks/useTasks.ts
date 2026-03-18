@@ -43,13 +43,16 @@ async function sendTaskNotification(
     });
 }
 
+import { useAuth } from "@/hooks/useAuth";
+
 export function useTasks() {
     const queryClient = useQueryClient();
+    const { isAdmin, user } = useAuth();
 
     const { data: tasks, isLoading, error } = useQuery({
-        queryKey: ["tasks"],
+        queryKey: ["tasks", isAdmin, user?.id],
         queryFn: async () => {
-            const { data, error } = await supabase
+            let query = supabase
                 .from("tasks")
                 .select(`
                     *,
@@ -58,6 +61,11 @@ export function useTasks() {
                 `)
                 .order("created_at", { ascending: false });
 
+            if (!isAdmin && user?.id) {
+                query = query.eq("assigned_to", user.id);
+            }
+
+            const { data, error } = await query;
             if (error) throw error;
             return data as Task[];
         },
