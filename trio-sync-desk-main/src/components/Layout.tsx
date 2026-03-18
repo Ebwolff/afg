@@ -8,6 +8,7 @@ import { NavLink } from "./NavLink";
 import logo from "@/assets/logo.jpg";
 import { NotificationPopover } from "@/features/notifications/components/NotificationPopover";
 import { useAuth, AppPermission } from "@/hooks/useAuth";
+import { useDueDateNotifier } from "@/hooks/useDueDateNotifier";
 
 interface LayoutProps {
   children: ReactNode;
@@ -41,6 +42,7 @@ export function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { hasPermission, isAdmin } = useAuth();
+  useDueDateNotifier();
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();

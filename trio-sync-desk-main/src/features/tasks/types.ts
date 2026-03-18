@@ -43,7 +43,7 @@ export interface Notification {
     title: string;
     message: string;
     read: boolean;
-    type: 'task_assigned' | 'task_update' | 'system';
+    type: 'task_assigned' | 'task_update' | 'conta_pagar_vencimento' | 'conta_receber_vencimento' | 'system';
     link: string | null;
     created_at: string;
 }
