@@ -199,6 +199,13 @@ export function AtendimentoFormDialog({ onSubmit, isLoading }: AtendimentoFormDi
                                 <SelectItem value="financiamento_auto">Financiamento de Automóvel</SelectItem>
                                 <SelectItem value="credito_pessoal">Crédito Pessoal</SelectItem>
                                 <SelectItem value="consorcio">Consórcio</SelectItem>
+                                <SelectItem value="fgts">FGTS</SelectItem>
+                                <SelectItem value="inss">INSS</SelectItem>
+                                <SelectItem value="clt">CLT</SelectItem>
+                                <SelectItem value="construcao_civil">Construção Civil</SelectItem>
+                                <SelectItem value="consultoria_imobiliaria">Consultoria Imobiliária</SelectItem>
+                                <SelectItem value="carta_contemplada">Carta Contemplada</SelectItem>
+                                <SelectItem value="imoveis">Imóveis</SelectItem>
                                 <SelectItem value="outro">Outro</SelectItem>
                             </SelectContent>
                         </Select>
