@@ -470,14 +470,18 @@ export default function Administracao() {
                       // 1. Atualizar role do usuário
                       await updateUserRole.mutateAsync({ userId: selectedUser.id, roleId: selectedRoleId });
 
-                      // 2. Atualizar permissões da role
-                      const { error } = await supabase
+                      // 2. Atualizar permissões da role (com verificação)
+                      const { data: updated, error } = await supabase
                         .from("custom_roles")
                         .update({ permissions: selectedPermissions })
-                        .eq("id", selectedRoleId);
-                      if (error) throw error;
+                        .eq("id", selectedRoleId)
+                        .select("id, permissions")
+                        .single();
 
-                      toast({ title: "Permissões atualizadas!" });
+                      if (error) throw error;
+                      if (!updated) throw new Error("Não foi possível atualizar as permissões. Verifique se você tem permissão de administrador.");
+
+                      toast({ title: "Permissões atualizadas!", description: `${selectedPermissions.length} módulo(s) configurado(s).` });
                       setPermDialogOpen(false);
                       setSelectedUser(null);
                       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
