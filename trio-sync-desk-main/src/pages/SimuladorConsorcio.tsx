@@ -74,12 +74,10 @@ export default function SimuladorConsorcio() {
       const mutedColor: [number, number, number] = [107, 114, 128];
 
 
-      // --- Barra Superior ---
-      doc.setFillColor(...primaryColor);
-      doc.rect(6, 6, pageWidth - 12, 12, 'F');
-
-      // --- Logo + Info da Empresa ---
-      let yPos = 24;
+      // --- Pré-carregar logo (reutilizado em todas as páginas) ---
+      let loadedLogo: HTMLImageElement | null = null;
+      let logoDrawWidth = 40;
+      let logoDrawHeight = 25;
       try {
         const img = new Image();
         img.src = logoImg;
@@ -87,12 +85,27 @@ export default function SimuladorConsorcio() {
           img.onload = resolve;
           img.onerror = resolve;
         });
-        const imgWidth = 40;
-        const imgHeight = (img.height * imgWidth) / img.width;
-        doc.addImage(img, 'JPEG', marginLeft, yPos, imgWidth, Math.min(imgHeight, 25));
+        if (img.width > 0) {
+          logoDrawHeight = Math.min((img.height * logoDrawWidth) / img.width, 25);
+          loadedLogo = img;
+        }
       } catch (e) {
         console.error("Erro ao carregar logo", e);
       }
+
+      const drawLogo = (y: number) => {
+        if (loadedLogo) {
+          doc.addImage(loadedLogo, 'JPEG', marginLeft, y, logoDrawWidth, logoDrawHeight);
+        }
+      };
+
+      // --- Barra Superior ---
+      doc.setFillColor(...primaryColor);
+      doc.rect(6, 6, pageWidth - 12, 12, 'F');
+
+      // --- Logo + Info da Empresa ---
+      let yPos = 24;
+      drawLogo(yPos);
 
       doc.setTextColor(...secondaryColor);
       doc.setFontSize(13);
@@ -252,15 +265,7 @@ export default function SimuladorConsorcio() {
 
         // Logo + Info da Empresa (igual à página 1)
         let headerY = 24;
-        try {
-          const img = new Image();
-          img.src = logoImg;
-          const imgWidth = 40;
-          const imgHeight = (img.height * imgWidth) / img.width;
-          doc.addImage(img, 'JPEG', marginLeft, headerY, imgWidth, Math.min(imgHeight, 25));
-        } catch (e) {
-          // silently fail
-        }
+        drawLogo(headerY);
 
         doc.setTextColor(...secondaryColor);
         doc.setFontSize(13);
