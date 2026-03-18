@@ -481,9 +481,20 @@ export default function Administracao() {
                       if (error) throw error;
                       if (!updated) throw new Error("Não foi possível atualizar as permissões. Verifique se você tem permissão de administrador.");
 
+                      // Atualizar o cache otimistamente para refletir na tabela imediatamente
+                      queryClient.setQueryData<UserProfile[]>(["admin-users"], (old) =>
+                        old?.map((u) =>
+                          u.id === selectedUser.id
+                            ? { ...u, role_permissions: selectedPermissions, role_id: selectedRoleId }
+                            : u
+                        )
+                      );
+
                       toast({ title: "Permissões atualizadas!", description: `${selectedPermissions.length} módulo(s) configurado(s).` });
                       setPermDialogOpen(false);
                       setSelectedUser(null);
+
+                      // Refetch para consistência com o servidor
                       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
                       queryClient.invalidateQueries({ queryKey: ["custom-roles"] });
                     } catch (err: unknown) {
