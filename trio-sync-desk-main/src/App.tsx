@@ -12,6 +12,7 @@ import { HashRouter, Routes, Route } from "react-router-dom";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AuthProvider } from "./hooks/useAuth";
 import { HideValuesProvider } from "./hooks/useHideValues";
+import { ThemeProvider } from "./hooks/useTheme";
 
 // Lazy-loaded Pages (code splitting)
 const Index = lazy(() => import("./pages/Index"));
@@ -57,6 +58,7 @@ const App = () => (
         <ErrorBoundary>
           <HashRouter>
             <AuthProvider>
+              <ThemeProvider>
               <HideValuesProvider>
               <Suspense fallback={<div className="flex items-center justify-center h-screen">Carregando...</div>}>
                 <Routes>
@@ -82,6 +84,7 @@ const App = () => (
                 </Routes>
               </Suspense>
               </HideValuesProvider>
+              </ThemeProvider>
             </AuthProvider>
           </HashRouter>
         </ErrorBoundary>

@@ -4,7 +4,7 @@ import {
     LayoutDashboard, Users, UserCircle, Package, Calendar, DollarSign,
     LogOut, Calculator, FileText, ArrowDownCircle, ArrowUpCircle, Image,
     CheckSquare, Target, Shield, TrendingUp, LucideIcon, Menu, X,
-    ChevronLeft, ChevronRight, Eye, EyeOff,
+    ChevronLeft, ChevronRight, Eye, EyeOff, Moon, Sun,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "./ui/tooltip";
@@ -16,6 +16,7 @@ import { useAuth, AppPermission } from "@/hooks/useAuth";
 import { useDueDateNotifier } from "@/hooks/useDueDateNotifier";
 import { useNativeNotifications } from "@/hooks/useNativeNotifications";
 import { useHideValues } from "@/hooks/useHideValues";
+import { useTheme } from "@/hooks/useTheme";
 
 interface LayoutProps {
     children: ReactNode;
@@ -55,6 +56,7 @@ export function Layout({ children }: LayoutProps) {
     useDueDateNotifier();
     useNativeNotifications();
     const { hidden, toggle: toggleValues } = useHideValues();
+    const { theme, toggle: toggleTheme } = useTheme();
 
     const [collapsed, setCollapsed] = useState(() => {
         try { return localStorage.getItem(SIDEBAR_KEY) === "true"; } catch { return false; }
@@ -260,7 +262,15 @@ export function Layout({ children }: LayoutProps) {
                     </div>
 
                     {/* Right: notifications + user */}
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={toggleTheme}
+                            title={theme === "dark" ? "Modo claro" : "Modo escuro"}
+                        >
+                            {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+                        </Button>
                         <Button
                             variant="ghost"
                             size="icon"
