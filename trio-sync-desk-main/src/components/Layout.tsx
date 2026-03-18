@@ -17,6 +17,7 @@ import { useDueDateNotifier } from "@/hooks/useDueDateNotifier";
 import { useNativeNotifications } from "@/hooks/useNativeNotifications";
 import { useHideValues } from "@/hooks/useHideValues";
 import { useTheme } from "@/hooks/useTheme";
+import { GlobalSearch } from "./GlobalSearch";
 
 interface LayoutProps {
     children: ReactNode;
@@ -259,6 +260,11 @@ export function Layout({ children }: LayoutProps) {
                             <Menu className="h-5 w-5" />
                         </Button>
                         <img src={logo} alt="AFG" className="h-8 w-auto object-contain lg:hidden" />
+                    </div>
+
+                    {/* Center: search */}
+                    <div className="hidden sm:flex flex-1 justify-center px-4">
+                        <GlobalSearch />
                     </div>
 
                     {/* Right: notifications + user */}

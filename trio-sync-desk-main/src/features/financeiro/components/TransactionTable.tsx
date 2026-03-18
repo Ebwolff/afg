@@ -1,9 +1,10 @@
+import { useState, useEffect } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Check, X, Trash2, Pencil } from "lucide-react";
+import { Check, X, Trash2, Pencil, ChevronLeft, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Transacao } from "../types";
@@ -20,6 +21,15 @@ interface TransactionTableProps {
 
 export function TransactionTable({ transacoes, isLoading, onRegistrarPagamento, onCancelar, onDelete, onEdit }: TransactionTableProps) {
     const { mask } = useHideValues();
+    const PAGE_SIZE = 10;
+    const [page, setPage] = useState(1);
+
+    useEffect(() => { setPage(1); }, [transacoes?.length]);
+
+    const totalItems = transacoes?.length || 0;
+    const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+    const paginatedData = transacoes?.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) || [];
+
     const getStatusBadge = (status: string) => {
         const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
             pendente: "secondary",
@@ -51,6 +61,7 @@ export function TransactionTable({ transacoes, isLoading, onRegistrarPagamento, 
     }
 
     return (
+        <>
         <Table>
             <TableHeader>
                 <TableRow>
@@ -64,7 +75,7 @@ export function TransactionTable({ transacoes, isLoading, onRegistrarPagamento, 
                 </TableRow>
             </TableHeader>
             <TableBody>
-                {transacoes.map((transacao) => (
+                {paginatedData.map((transacao) => (
                     <TableRow key={transacao.id}>
                         <TableCell>
                             {(() => {
@@ -152,5 +163,34 @@ export function TransactionTable({ transacoes, isLoading, onRegistrarPagamento, 
                 ))}
             </TableBody>
         </Table>
+
+        {totalPages > 1 && (
+            <div className="flex items-center justify-between px-2 py-3 border-t">
+                <span className="text-sm text-muted-foreground">
+                    {totalItems} registro(s) • Página {page} de {totalPages}
+                </span>
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        disabled={page <= 1}
+                    >
+                        <ChevronLeft className="h-4 w-4" />
+                        Anterior
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={page >= totalPages}
+                    >
+                        Próximo
+                        <ChevronRight className="h-4 w-4" />
+                    </Button>
+                </div>
+            </div>
+        )}
+      </>
     );
 }
