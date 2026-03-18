@@ -246,22 +246,34 @@ export default function SimuladorConsorcio() {
       };
 
       const drawContinuationHeader = () => {
-        // Barra superior
+        // Barra superior (igual à página 1)
         doc.setFillColor(...primaryColor);
         doc.rect(6, 6, pageWidth - 12, 12, 'F');
 
-        let headerY = 28;
+        // Logo + Info da Empresa (igual à página 1)
+        let headerY = 24;
+        try {
+          const img = new Image();
+          img.src = logoImg;
+          const imgWidth = 40;
+          const imgHeight = (img.height * imgWidth) / img.width;
+          doc.addImage(img, 'JPEG', marginLeft, headerY, imgWidth, Math.min(imgHeight, 25));
+        } catch (e) {
+          // silently fail
+        }
+
         doc.setTextColor(...secondaryColor);
-        doc.setFontSize(11);
+        doc.setFontSize(13);
         doc.setFont("helvetica", "bold");
-        doc.text("AFG Soluções Financeiras", marginLeft, headerY);
+        doc.text("AFG Soluções Financeiras", marginRight, headerY + 8, { align: "right" });
 
         doc.setFontSize(9);
-        doc.setTextColor(...mutedColor);
         doc.setFont("helvetica", "normal");
-        doc.text(`Simulação — ${clienteNome}`, marginRight, headerY, { align: "right" });
+        doc.setTextColor(...mutedColor);
+        doc.text("Planejamento e Consultoria", marginRight, headerY + 15, { align: "right" });
 
-        headerY += 8;
+        // Linha divisória
+        headerY = 56;
         doc.setDrawColor(229, 231, 235);
         doc.setLineWidth(0.5);
         doc.line(marginLeft, headerY, marginRight, headerY);
