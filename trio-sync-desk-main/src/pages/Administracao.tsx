@@ -66,31 +66,17 @@ export default function Administracao() {
   const handleCreateUser = async () => {
     setCreatingUser(true);
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email: newUser.email,
-        password: newUser.password,
-        options: {
-          data: { nome: newUser.nome },
-          emailRedirectTo: `${window.location.origin}/dashboard`,
+      const { data, error } = await supabase.functions.invoke("admin-create-user", {
+        body: {
+          email: newUser.email,
+          password: newUser.password,
+          nome: newUser.nome,
+          role: newUser.role,
         },
       });
 
       if (error) throw error;
-
-      if (data.user) {
-        const { error: roleError } = await supabase.from("user_roles").insert({
-          user_id: data.user.id,
-          role: newUser.role,
-        });
-        if (roleError) throw roleError;
-
-        if (newUser.role === "servicos") {
-          await supabase
-            .from("profiles")
-            .update({ permissions: ["dashboard"] })
-            .eq("id", data.user.id);
-        }
-      }
+      if (data?.error) throw new Error(data.error);
 
       toast({ title: "Usuário criado com sucesso!" });
       setCreateDialogOpen(false);
@@ -170,17 +156,12 @@ export default function Administracao() {
 
   const deleteUser = useMutation({
     mutationFn: async (userId: string) => {
-      const { error: roleError } = await supabase
-        .from("user_roles")
-        .delete()
-        .eq("user_id", userId);
-      if (roleError) throw roleError;
+      const { data, error } = await supabase.functions.invoke("admin-delete-user", {
+        body: { userId },
+      });
 
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .delete()
-        .eq("id", userId);
-      if (profileError) throw profileError;
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
     },
     onSuccess: () => {
       toast({ title: "Usuário removido!" });
