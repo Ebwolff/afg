@@ -15,7 +15,7 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Não autorizado" }), {
-        status: 401,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -23,20 +23,22 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    const userClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } },
-    });
+    // Admin client (bypasses RLS)
+    const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-    const { data: { user: caller } } = await userClient.auth.getUser();
-    if (!caller) {
-      return new Response(JSON.stringify({ error: "Não autorizado" }), {
-        status: 401,
+    // Verificar caller via JWT
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user: caller }, error: authError } = await adminClient.auth.getUser(token);
+
+    if (authError || !caller) {
+      return new Response(JSON.stringify({ error: "Token inválido" }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Verificar se é admin
-    const { data: roleData } = await userClient
+    // Verificar se é admin (via adminClient - bypasses RLS)
+    const { data: roleData } = await adminClient
       .from("user_roles")
       .select("role")
       .eq("user_id", caller.id)
@@ -44,15 +46,17 @@ serve(async (req) => {
 
     if (roleData?.role !== "admin") {
       return new Response(JSON.stringify({ error: "Acesso restrito a administradores" }), {
-        status: 403,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const { userId } = await req.json();
+    const body = await req.json();
+    const { userId } = body;
+
     if (!userId) {
       return new Response(JSON.stringify({ error: "userId é obrigatório" }), {
-        status: 400,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -60,12 +64,10 @@ serve(async (req) => {
     // Impedir auto-exclusão
     if (userId === caller.id) {
       return new Response(JSON.stringify({ error: "Você não pode excluir a si mesmo" }), {
-        status: 400,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
     // Remover role
     await adminClient.from("user_roles").delete().eq("user_id", userId);
@@ -77,7 +79,7 @@ serve(async (req) => {
     const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
     if (deleteError) {
       return new Response(JSON.stringify({ error: deleteError.message }), {
-        status: 400,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -87,8 +89,8 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
+    return new Response(JSON.stringify({ error: String(err?.message || err) }), {
+      status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
