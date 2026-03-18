@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { LayoutDashboard, Users, UserCircle, Package, Calendar, DollarSign, LogOut, Calculator, FileText, ArrowDownCircle, ArrowUpCircle, Image, CheckSquare, Target, Shield, LucideIcon } from "lucide-react";
+import { LayoutDashboard, Users, UserCircle, Package, Calendar, DollarSign, LogOut, Calculator, FileText, ArrowDownCircle, ArrowUpCircle, Image, CheckSquare, Target, Shield, TrendingUp, LucideIcon } from "lucide-react";
 import { Button } from "./ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -24,6 +24,7 @@ const navItems: NavItem[] = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard", permission: "dashboard" },
   { to: "/leads", icon: Target, label: "Leads", permission: "leads" },
   { to: "/tasks", icon: CheckSquare, label: "Tarefas", permission: "tasks" },
+  { to: "/produtividade", icon: TrendingUp, label: "Produtividade", permission: "produtividade" },
   { to: "/atendimentos", icon: Users, label: "Atendimentos", permission: "atendimentos" },
   { to: "/clientes", icon: UserCircle, label: "Clientes", permission: "clientes" },
   { to: "/produtos", icon: Package, label: "Produtos", permission: "produtos" },

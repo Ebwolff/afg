@@ -27,6 +27,7 @@ const SimuladorConsorcio = lazy(() => import("./pages/SimuladorConsorcio"));
 const Relatorios = lazy(() => import("./pages/Relatorios"));
 const Banners = lazy(() => import("./pages/Banners"));
 const TasksPage = lazy(() => import("./features/tasks/pages/TasksPage"));
+const Produtividade = lazy(() => import("./pages/Produtividade"));
 const LeadsPage = lazy(() => import("./features/leads/pages/LeadsPage"));
 const Administracao = lazy(() => import("./pages/Administracao"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -64,6 +65,7 @@ const App = () => (
                   <Route path="/contas-pagar" element={<ProtectedRoute requiredPermission="contas_pagar"><ContasPagar /></ProtectedRoute>} />
                   <Route path="/contas-receber" element={<ProtectedRoute requiredPermission="contas_receber"><ContasReceber /></ProtectedRoute>} />
                   <Route path="/tasks" element={<ProtectedRoute requiredPermission="tasks"><TasksPage /></ProtectedRoute>} />
+                  <Route path="/produtividade" element={<ProtectedRoute requiredPermission="produtividade"><Produtividade /></ProtectedRoute>} />
                   <Route path="/leads" element={<ProtectedRoute requiredPermission="leads"><LeadsPage /></ProtectedRoute>} />
                   <Route path="/atendimentos" element={<ProtectedRoute requiredPermission="atendimentos"><Atendimentos /></ProtectedRoute>} />
                   <Route path="/clientes" element={<ProtectedRoute requiredPermission="clientes"><Clientes /></ProtectedRoute>} />

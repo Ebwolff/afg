@@ -3,7 +3,7 @@ import { useDashboardData } from "@/features/dashboard/hooks/useDashboardData";
 import { DashboardSummaryCards } from "@/features/dashboard/components/DashboardSummaryCards";
 import { DashboardCharts } from "@/features/dashboard/components/DashboardCharts";
 import { DashboardAlerts } from "@/features/dashboard/components/DashboardAlerts";
-import { ProductivityPanel } from "@/components/ProductivityPanel";
+
 
 import { DashboardSkeleton } from "@/components/skeletons/DashboardSkeleton";
 
@@ -53,7 +53,7 @@ export default function Dashboard() {
           statusData={statusData}
         />
 
-        <ProductivityPanel />
+
       </div>
     </Layout>
   );

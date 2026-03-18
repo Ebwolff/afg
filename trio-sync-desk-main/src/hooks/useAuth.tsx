@@ -8,6 +8,7 @@ export type AppPermission =
   | "dashboard"
   | "leads"
   | "tasks"
+  | "produtividade"
   | "atendimentos"
   | "clientes"
   | "produtos"
@@ -23,6 +24,7 @@ export const ALL_PERMISSIONS: { id: AppPermission; label: string }[] = [
   { id: "dashboard", label: "Dashboard" },
   { id: "leads", label: "Leads" },
   { id: "tasks", label: "Tarefas" },
+  { id: "produtividade", label: "Produtividade" },
   { id: "atendimentos", label: "Atendimentos" },
   { id: "clientes", label: "Clientes" },
   { id: "produtos", label: "Produtos" },
