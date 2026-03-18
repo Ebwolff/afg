@@ -3,6 +3,7 @@ import { useDashboardData } from "@/features/dashboard/hooks/useDashboardData";
 import { DashboardSummaryCards } from "@/features/dashboard/components/DashboardSummaryCards";
 import { DashboardCharts } from "@/features/dashboard/components/DashboardCharts";
 import { DashboardAlerts } from "@/features/dashboard/components/DashboardAlerts";
+import { ProductivityPanel } from "@/components/ProductivityPanel";
 
 import { DashboardSkeleton } from "@/components/skeletons/DashboardSkeleton";
 
@@ -14,7 +15,7 @@ export default function Dashboard() {
     saldo,
     fluxoData,
     statusData,
-    alertas, // Keep alerts for DashboardAlerts
+    alertas,
   } = useDashboardData();
 
 
@@ -51,7 +52,10 @@ export default function Dashboard() {
           fluxoData={fluxoData}
           statusData={statusData}
         />
+
+        <ProductivityPanel />
       </div>
     </Layout>
   );
 }
+

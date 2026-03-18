@@ -111,13 +111,20 @@ export function useTasks() {
     });
 
     const updateTask = useMutation({
-        mutationFn: async ({ id, updates }: { id: string; updates: Partial<TaskFormData> }) => {
+        mutationFn: async ({ id, updates }: { id: string; updates: Partial<TaskFormData> & { status?: string } }) => {
+            const payload: Record<string, unknown> = {
+                ...updates,
+                due_date: updates.due_date?.toISOString(),
+            };
+
+            // Preencher completed_at ao marcar como concluída
+            if (updates.status === "completed") {
+                payload.completed_at = new Date().toISOString();
+            }
+
             const { data, error } = await supabase
                 .from("tasks")
-                .update({
-                    ...updates,
-                    due_date: updates.due_date?.toISOString(),
-                })
+                .update(payload)
                 .eq("id", id)
                 .select()
                 .single();
