@@ -24,7 +24,6 @@ serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-    // Verificar caller
     const token = authHeader.replace("Bearer ", "");
     const { data: { user: caller }, error: authError } = await adminClient.auth.getUser(token);
 
@@ -35,7 +34,6 @@ serve(async (req) => {
       });
     }
 
-    // Verificar admin
     const { data: roleData } = await adminClient
       .from("user_roles")
       .select("role")
@@ -66,58 +64,79 @@ serve(async (req) => {
       });
     }
 
-    // Usar SQL direto para limpar TODAS as referências de uma vez
-    // Isso garante que nenhuma FK seja esquecida
-    const { error: cleanupError } = await adminClient.rpc("admin_cleanup_user_refs", {
-      target_user_id: userId,
-    });
+    // ========================================================
+    // STEP 1: Limpar TODAS as FK references
+    // ========================================================
+    const fkCleanup = [
+      // FKs que referenciam profiles(id)
+      { table: "clientes", col: "created_by" },
+      { table: "servicos", col: "atendido_por" },
+      { table: "atendimentos", col: "solicitado_por" },
+      { table: "atendimentos", col: "atendido_por" },
+      { table: "atendimentos", col: "vendedor_id" },
+      { table: "atendimentos", col: "digitador_id" },
+      { table: "transacoes", col: "created_by" },
+      { table: "eventos", col: "created_by" },
+      { table: "tarefas", col: "assigned_to" },
+      { table: "tarefas", col: "created_by" },
+      // FKs que referenciam auth.users(id)
+      { table: "produtos", col: "created_by" },
+      { table: "simulacoes_consorcio", col: "created_by" },
+    ];
 
-    // Se a função RPC não existir, limpar manualmente
-    if (cleanupError) {
-      // Limpar FKs que referenciam profiles(id)
-      const profileTables = [
-        { table: "clientes", col: "created_by" },
-        { table: "servicos", col: "atendido_por" },
-        { table: "atendimentos", col: "solicitado_por" },
-        { table: "atendimentos", col: "atendido_por" },
-        { table: "atendimentos", col: "vendedor_id" },
-        { table: "atendimentos", col: "digitador_id" },
-        { table: "transacoes", col: "created_by" },
-        { table: "eventos", col: "created_by" },
-      ];
+    const errors = [];
 
-      for (const { table, col } of profileTables) {
-        await adminClient.from(table).update({ [col]: null }).eq(col, userId);
-      }
-
-      // Limpar FKs que referenciam auth.users(id)
-      const authTables = [
-        { table: "produtos", col: "created_by" },
-        { table: "simulacoes_consorcio", col: "created_by" },
-      ];
-
-      for (const { table, col } of authTables) {
-        await adminClient.from(table).update({ [col]: null }).eq(col, userId);
+    for (const { table, col } of fkCleanup) {
+      const { error } = await adminClient
+        .from(table)
+        .update({ [col]: null })
+        .eq(col, userId);
+      if (error) {
+        errors.push(`${table}.${col}: ${error.message}`);
       }
     }
 
-    // Remover user_roles
+    // Deletar notificações do usuário (não SET NULL, DELETE)
+    await adminClient.from("notifications").delete().eq("user_id", userId);
+
+    // ========================================================
+    // STEP 2: Remover user_roles
+    // ========================================================
     await adminClient.from("user_roles").delete().eq("user_id", userId);
 
-    // Remover profile diretamente (antes de auth, para evitar FK cascade issues)
-    await adminClient.from("profiles").delete().eq("id", userId);
+    // ========================================================
+    // STEP 3: Deletar profile explicitamente
+    // ========================================================
+    const { error: profileDelError } = await adminClient
+      .from("profiles")
+      .delete()
+      .eq("id", userId);
 
-    // Deletar de auth.users
+    if (profileDelError) {
+      errors.push(`profiles: ${profileDelError.message}`);
+    }
+
+    // ========================================================
+    // STEP 4: Deletar de auth.users
+    // ========================================================
     const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
     if (deleteError) {
-      // Se ainda falhar, tentar com softDelete
-      const { error: softDeleteError } = await adminClient.auth.admin.deleteUser(userId, true);
-      if (softDeleteError) {
+      // Se profile ja foi deletado, tá ok — retornar sucesso parcial
+      if (profileDelError) {
         return new Response(
-          JSON.stringify({ error: `Falha ao deletar: ${deleteError.message}. Soft delete: ${softDeleteError.message}` }),
+          JSON.stringify({
+            error: `Profile: ${profileDelError.message}. Auth: ${deleteError.message}. FK cleanup errors: ${errors.join("; ")}`,
+          }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+      // Profile deletado mas auth falhou  — still partial success
+      return new Response(
+        JSON.stringify({
+          error: `Auth delete falhou: ${deleteError.message}. Mas o perfil foi removido.`,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     return new Response(JSON.stringify({ success: true }), {
