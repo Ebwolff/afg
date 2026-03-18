@@ -1,27 +1,21 @@
 import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import { useFirstPermittedRoute } from "@/hooks/useFirstPermittedRoute";
+import { useNavigate, Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 
 const Index = () => {
-  const navigate = useNavigate();
-  const { loading: authLoading } = useAuth();
-  const firstRoute = useFirstPermittedRoute();
+  const { user, loading, isAdmin } = useAuth();
 
-  useEffect(() => {
-    if (authLoading) return; // Esperar o role carregar
+  // Ainda carregando auth — mostrar nada
+  if (loading) return null;
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        navigate(firstRoute);
-      } else {
-        navigate("/auth");
-      }
-    });
-  }, [navigate, firstRoute, authLoading]);
+  // Não logado — ir para auth
+  if (!user) return <Navigate to="/auth" replace />;
 
-  return null;
+  // Admin → Produtividade
+  if (isAdmin) return <Navigate to="/produtividade" replace />;
+
+  // Serviços/outros → Agenda
+  return <Navigate to="/agenda" replace />;
 };
 
 export default Index;
