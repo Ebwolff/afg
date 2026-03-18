@@ -73,10 +73,6 @@ export default function SimuladorConsorcio() {
       const secondaryColor: [number, number, number] = [31, 41, 55];
       const mutedColor: [number, number, number] = [107, 114, 128];
 
-      // --- Borda da Página ---
-      doc.setDrawColor(...primaryColor);
-      doc.setLineWidth(1);
-      doc.rect(5, 5, pageWidth - 10, pageHeight - 10);
 
       // --- Barra Superior ---
       doc.setFillColor(...primaryColor);
@@ -213,7 +209,67 @@ export default function SimuladorConsorcio() {
       doc.setFont("helvetica", "normal");
       doc.text("* Valores sujeitos a alteração sem aviso prévio. Consulte condições.", pageWidth / 2, yPos, { align: "center" });
 
-      // --- Observações ---
+      // --- Helpers para multi-página ---
+      const footerReserved = 50; // espaço reservado para rodapé
+      const maxContentY = pageHeight - footerReserved;
+
+      const drawPageBorder = () => {
+        doc.setDrawColor(...primaryColor);
+        doc.setLineWidth(1);
+        doc.rect(5, 5, pageWidth - 10, pageHeight - 10);
+      };
+
+      const drawPageFooter = () => {
+        const footerY = pageHeight - 38;
+        doc.setFontSize(6);
+        doc.setTextColor(...mutedColor);
+        doc.setFont("helvetica", "normal");
+        const disclaimer = "Esta simulação é de caráter meramente informativo e não constitui obrigação de negócio. Os valores apresentados são estimados e podem sofrer variações de acordo com a tabela vigente na data da contratação. A aprovação do crédito está sujeita à análise.";
+        const splitDisclaimer = doc.splitTextToSize(disclaimer, contentWidth);
+        doc.text(splitDisclaimer, marginLeft, footerY);
+
+        const contactY = pageHeight - 20;
+        doc.setDrawColor(229, 231, 235);
+        doc.line(marginLeft, contactY - 4, marginRight, contactY - 4);
+
+        doc.setFontSize(7);
+        doc.setTextColor(...primaryColor);
+        doc.setFont("helvetica", "bold");
+
+        const leftColX = pageWidth / 4;
+        const rightColX = (pageWidth / 4) * 3;
+
+        doc.text("Instagram: @afg_solucoesfinanceiras", leftColX, contactY, { align: "center" });
+        doc.text("WhatsApp: +55 99 99168-5741", rightColX, contactY, { align: "center" });
+        doc.text("End: Rua Bom Jesus, 309, Centro, Balsas - MA", leftColX, contactY + 5, { align: "center" });
+        doc.text("Email: aafgsolucoesfinanceiras@gmail.com", rightColX, contactY + 5, { align: "center" });
+      };
+
+      const drawContinuationHeader = () => {
+        // Barra superior
+        doc.setFillColor(...primaryColor);
+        doc.rect(6, 6, pageWidth - 12, 12, 'F');
+
+        let headerY = 28;
+        doc.setTextColor(...secondaryColor);
+        doc.setFontSize(11);
+        doc.setFont("helvetica", "bold");
+        doc.text("AFG Soluções Financeiras", marginLeft, headerY);
+
+        doc.setFontSize(9);
+        doc.setTextColor(...mutedColor);
+        doc.setFont("helvetica", "normal");
+        doc.text(`Simulação — ${clienteNome}`, marginRight, headerY, { align: "right" });
+
+        headerY += 8;
+        doc.setDrawColor(229, 231, 235);
+        doc.setLineWidth(0.5);
+        doc.line(marginLeft, headerY, marginRight, headerY);
+
+        return headerY + 10;
+      };
+
+      // --- Observações com paginação ---
       if (observacoes) {
         yPos += 10;
         doc.setFontSize(10);
@@ -221,39 +277,45 @@ export default function SimuladorConsorcio() {
         doc.setFont("helvetica", "bold");
         doc.text("Observações", marginLeft, yPos);
         yPos += 6;
+
         doc.setTextColor(...secondaryColor);
         doc.setFont("helvetica", "normal");
         doc.setFontSize(9);
-        const splitObs = doc.splitTextToSize(observacoes, contentWidth);
-        doc.text(splitObs, marginLeft, yPos);
+        const splitObs: string[] = doc.splitTextToSize(observacoes, contentWidth);
+        const lineHeight = 4.5;
+
+        for (let i = 0; i < splitObs.length; i++) {
+          // Verificar se a próxima linha caberia antes do rodapé
+          if (yPos + lineHeight > maxContentY) {
+            // Desenhar rodapé e borda na página atual
+            drawPageFooter();
+            drawPageBorder();
+
+            // Nova página
+            doc.addPage();
+            drawPageBorder();
+            yPos = drawContinuationHeader();
+
+            // Recontinuar título de observações
+            doc.setFontSize(10);
+            doc.setTextColor(...primaryColor);
+            doc.setFont("helvetica", "bold");
+            doc.text("Observações (continuação)", marginLeft, yPos);
+            yPos += 6;
+
+            doc.setTextColor(...secondaryColor);
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(9);
+          }
+
+          doc.text(splitObs[i], marginLeft, yPos);
+          yPos += lineHeight;
+        }
       }
 
-      // --- Rodapé (posição fixa na parte inferior) ---
-      const footerY = pageHeight - 38;
-
-      doc.setFontSize(6);
-      doc.setTextColor(...mutedColor);
-      doc.setFont("helvetica", "normal");
-      const disclaimer = "Esta simulação é de caráter meramente informativo e não constitui obrigação de negócio. Os valores apresentados são estimados e podem sofrer variações de acordo com a tabela vigente na data da contratação. A aprovação do crédito está sujeita à análise.";
-      const splitDisclaimer = doc.splitTextToSize(disclaimer, contentWidth);
-      doc.text(splitDisclaimer, marginLeft, footerY);
-
-      // Contatos
-      const contactY = pageHeight - 20;
-      doc.setDrawColor(229, 231, 235);
-      doc.line(marginLeft, contactY - 4, marginRight, contactY - 4);
-
-      doc.setFontSize(7);
-      doc.setTextColor(...primaryColor);
-      doc.setFont("helvetica", "bold");
-
-      const leftColX = pageWidth / 4;
-      const rightColX = (pageWidth / 4) * 3;
-
-      doc.text("Instagram: @afg_solucoesfinanceiras", leftColX, contactY, { align: "center" });
-      doc.text("WhatsApp: +55 99 99168-5741", rightColX, contactY, { align: "center" });
-      doc.text("End: Rua Bom Jesus, 309, Centro, Balsas - MA", leftColX, contactY + 5, { align: "center" });
-      doc.text("Email: aafgsolucoesfinanceiras@gmail.com", rightColX, contactY + 5, { align: "center" });
+      // --- Rodapé e borda da última página ---
+      drawPageFooter();
+      drawPageBorder();
 
       // Salvar
       const fileName = `Simulacao_Consorcio_${clienteNome.replace(/\s+/g, '_') || 'Cliente'}_${new Date().toISOString().split('T')[0]}.pdf`;
