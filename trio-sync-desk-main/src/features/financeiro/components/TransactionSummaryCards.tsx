@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle } from "lucide-react";
 import { Transacao } from "../types";
+import { useHideValues } from "@/hooks/useHideValues";
 
 interface TransactionSummaryCardsProps {
     transacoes: Transacao[] | undefined;
@@ -10,6 +11,7 @@ interface TransactionSummaryCardsProps {
 }
 
 export function TransactionSummaryCards({ transacoes, isLoading, type }: TransactionSummaryCardsProps) {
+    const { mask } = useHideValues();
     const calcularResumo = () => {
         if (!transacoes) return { total: 0, vencidas: 0, pagas: 0, aVencer7Dias: 0 };
 
@@ -68,7 +70,7 @@ export function TransactionSummaryCards({ transacoes, isLoading, type }: Transac
                 </CardHeader>
                 <CardContent>
                     <div className="text-2xl font-bold">
-                        {isLoading ? <Skeleton className="h-8 w-32" /> : new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(resumo.total)}
+                        {isLoading ? <Skeleton className="h-8 w-32" /> : mask(resumo.total)}
                     </div>
                     <p className="text-xs text-muted-foreground">{subtitles.total}</p>
                 </CardContent>
@@ -83,7 +85,7 @@ export function TransactionSummaryCards({ transacoes, isLoading, type }: Transac
                 </CardHeader>
                 <CardContent>
                     <div className="text-2xl font-bold text-destructive">
-                        {isLoading ? <Skeleton className="h-8 w-32" /> : new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(resumo.vencidas)}
+                        {isLoading ? <Skeleton className="h-8 w-32" /> : mask(resumo.vencidas)}
                     </div>
                     <p className="text-xs text-muted-foreground">{subtitles.vencidas}</p>
                 </CardContent>
@@ -95,7 +97,7 @@ export function TransactionSummaryCards({ transacoes, isLoading, type }: Transac
                 </CardHeader>
                 <CardContent>
                     <div className="text-2xl font-bold">
-                        {isLoading ? <Skeleton className="h-8 w-32" /> : new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(resumo.pagas)}
+                        {isLoading ? <Skeleton className="h-8 w-32" /> : mask(resumo.pagas)}
                     </div>
                     <p className="text-xs text-muted-foreground">{subtitles.pagas}</p>
                 </CardContent>
@@ -107,7 +109,7 @@ export function TransactionSummaryCards({ transacoes, isLoading, type }: Transac
                 </CardHeader>
                 <CardContent>
                     <div className={`text-2xl font-bold ${type === "receita" ? "text-green-600" : "text-orange-600"}`}>
-                        {isLoading ? <Skeleton className="h-8 w-32" /> : new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(resumo.aVencer7Dias)}
+                        {isLoading ? <Skeleton className="h-8 w-32" /> : mask(resumo.aVencer7Dias)}
                     </div>
                     <p className="text-xs text-muted-foreground">{subtitles.previsao}</p>
                 </CardContent>

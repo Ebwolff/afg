@@ -11,6 +11,7 @@ import { QueryClient } from "@tanstack/react-query";
 import { HashRouter, Routes, Route } from "react-router-dom";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AuthProvider } from "./hooks/useAuth";
+import { HideValuesProvider } from "./hooks/useHideValues";
 
 // Lazy-loaded Pages (code splitting)
 const Index = lazy(() => import("./pages/Index"));
@@ -56,6 +57,7 @@ const App = () => (
         <ErrorBoundary>
           <HashRouter>
             <AuthProvider>
+              <HideValuesProvider>
               <Suspense fallback={<div className="flex items-center justify-center h-screen">Carregando...</div>}>
                 <Routes>
                   <Route path="/" element={<Index />} />
@@ -79,6 +81,7 @@ const App = () => (
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </Suspense>
+              </HideValuesProvider>
             </AuthProvider>
           </HashRouter>
         </ErrorBoundary>

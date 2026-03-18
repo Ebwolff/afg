@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DollarSign, TrendingUp, Users, ClipboardList } from "lucide-react";
+import { useHideValues } from "@/hooks/useHideValues";
 
 interface DashboardSummaryCardsProps {
     loading: boolean;
@@ -15,6 +16,8 @@ export function DashboardSummaryCards({
     clientesCount,
     atendimentosCount,
 }: DashboardSummaryCardsProps) {
+    const { mask } = useHideValues();
+
     return (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
@@ -27,11 +30,11 @@ export function DashboardSummaryCards({
                         <Skeleton className="h-8 w-24" />
                     ) : (
                         <div className="text-2xl font-bold text-primary">
-                            {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(saldo.saldo)}
+                            {mask(saldo.saldo)}
                         </div>
                     )}
                     <p className="text-xs text-muted-foreground">
-                        {saldo.entradas > 0 && `+${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(saldo.entradas)} entradas`}
+                        {saldo.entradas > 0 && `+${mask(saldo.entradas)} entradas`}
                     </p>
                 </CardContent>
             </Card>
@@ -46,7 +49,7 @@ export function DashboardSummaryCards({
                         <Skeleton className="h-8 w-24" />
                     ) : (
                         <div className="text-2xl font-bold text-destructive">
-                            {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(saldo.saidas)}
+                            {mask(saldo.saidas)}
                         </div>
                     )}
                     <p className="text-xs text-muted-foreground">Total de saídas</p>

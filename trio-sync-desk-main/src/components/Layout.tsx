@@ -4,7 +4,7 @@ import {
     LayoutDashboard, Users, UserCircle, Package, Calendar, DollarSign,
     LogOut, Calculator, FileText, ArrowDownCircle, ArrowUpCircle, Image,
     CheckSquare, Target, Shield, TrendingUp, LucideIcon, Menu, X,
-    ChevronLeft, ChevronRight,
+    ChevronLeft, ChevronRight, Eye, EyeOff,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "./ui/tooltip";
@@ -15,6 +15,7 @@ import { NotificationPopover } from "@/features/notifications/components/Notific
 import { useAuth, AppPermission } from "@/hooks/useAuth";
 import { useDueDateNotifier } from "@/hooks/useDueDateNotifier";
 import { useNativeNotifications } from "@/hooks/useNativeNotifications";
+import { useHideValues } from "@/hooks/useHideValues";
 
 interface LayoutProps {
     children: ReactNode;
@@ -53,6 +54,7 @@ export function Layout({ children }: LayoutProps) {
     const { hasPermission, isAdmin, profile } = useAuth();
     useDueDateNotifier();
     useNativeNotifications();
+    const { hidden, toggle: toggleValues } = useHideValues();
 
     const [collapsed, setCollapsed] = useState(() => {
         try { return localStorage.getItem(SIDEBAR_KEY) === "true"; } catch { return false; }
@@ -259,6 +261,14 @@ export function Layout({ children }: LayoutProps) {
 
                     {/* Right: notifications + user */}
                     <div className="flex items-center gap-3">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={toggleValues}
+                            title={hidden ? "Mostrar valores" : "Ocultar valores"}
+                        >
+                            {hidden ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                        </Button>
                         <NotificationPopover />
                         {profile && (
                             <div className="hidden sm:flex items-center gap-2">
