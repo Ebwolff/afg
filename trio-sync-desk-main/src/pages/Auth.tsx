@@ -26,7 +26,8 @@ export default function Auth() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
-        navigate(firstRoute);
+        // Navegar para / e deixar o Index resolver a rota por role
+        navigate("/");
       }
     });
 
