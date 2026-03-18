@@ -66,31 +66,58 @@ serve(async (req) => {
       });
     }
 
-    // Limpar TODAS as FK references antes de deletar
-    // --- FKs que referenciam profiles(id) ---
-    await adminClient.from("clientes").update({ created_by: null }).eq("created_by", userId);
-    await adminClient.from("servicos").update({ atendido_por: null }).eq("atendido_por", userId);
-    await adminClient.from("atendimentos").update({ solicitado_por: null }).eq("solicitado_por", userId);
-    await adminClient.from("atendimentos").update({ atendido_por: null }).eq("atendido_por", userId);
-    await adminClient.from("atendimentos").update({ vendedor_id: null }).eq("vendedor_id", userId);
-    await adminClient.from("atendimentos").update({ digitador_id: null }).eq("digitador_id", userId);
-    await adminClient.from("transacoes").update({ created_by: null }).eq("created_by", userId);
-    await adminClient.from("eventos").update({ created_by: null }).eq("created_by", userId);
+    // Usar SQL direto para limpar TODAS as referências de uma vez
+    // Isso garante que nenhuma FK seja esquecida
+    const { error: cleanupError } = await adminClient.rpc("admin_cleanup_user_refs", {
+      target_user_id: userId,
+    });
 
-    // --- FKs que referenciam auth.users(id) diretamente ---
-    await adminClient.from("produtos").update({ created_by: null }).eq("created_by", userId);
-    await adminClient.from("simulacoes_consorcio").update({ created_by: null }).eq("created_by", userId);
+    // Se a função RPC não existir, limpar manualmente
+    if (cleanupError) {
+      // Limpar FKs que referenciam profiles(id)
+      const profileTables = [
+        { table: "clientes", col: "created_by" },
+        { table: "servicos", col: "atendido_por" },
+        { table: "atendimentos", col: "solicitado_por" },
+        { table: "atendimentos", col: "atendido_por" },
+        { table: "atendimentos", col: "vendedor_id" },
+        { table: "atendimentos", col: "digitador_id" },
+        { table: "transacoes", col: "created_by" },
+        { table: "eventos", col: "created_by" },
+      ];
 
-    // Remover user_roles explicitamente
+      for (const { table, col } of profileTables) {
+        await adminClient.from(table).update({ [col]: null }).eq(col, userId);
+      }
+
+      // Limpar FKs que referenciam auth.users(id)
+      const authTables = [
+        { table: "produtos", col: "created_by" },
+        { table: "simulacoes_consorcio", col: "created_by" },
+      ];
+
+      for (const { table, col } of authTables) {
+        await adminClient.from(table).update({ [col]: null }).eq(col, userId);
+      }
+    }
+
+    // Remover user_roles
     await adminClient.from("user_roles").delete().eq("user_id", userId);
 
-    // Deletar de auth.users (cascades to profiles)
+    // Remover profile diretamente (antes de auth, para evitar FK cascade issues)
+    await adminClient.from("profiles").delete().eq("id", userId);
+
+    // Deletar de auth.users
     const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
     if (deleteError) {
-      return new Response(JSON.stringify({ error: deleteError.message }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      // Se ainda falhar, tentar com softDelete
+      const { error: softDeleteError } = await adminClient.auth.admin.deleteUser(userId, true);
+      if (softDeleteError) {
+        return new Response(
+          JSON.stringify({ error: `Falha ao deletar: ${deleteError.message}. Soft delete: ${softDeleteError.message}` }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     return new Response(JSON.stringify({ success: true }), {
