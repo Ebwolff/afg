@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -21,11 +21,11 @@ import {
 } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarIcon, Loader2, Plus } from "lucide-react";
+import { Calendar as CalendarIcon, Loader2, Plus, Paperclip, X, FileIcon } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import { Task, TaskFormData, TaskPriority, TaskStatus, RelatedEntityType } from "../types";
+import { Task, TaskFormData, TaskPriority, TaskStatus } from "../types";
 import { useProfiles } from "../hooks/useProfiles";
 
 interface TaskFormDialogProps {
@@ -50,6 +50,7 @@ export function TaskFormDialog({
 
     const [isLoading, setIsLoading] = useState(false);
     const { data: profiles } = useProfiles();
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [formData, setFormData] = useState<TaskFormData>({
         title: "",
@@ -58,6 +59,7 @@ export function TaskFormDialog({
         priority: "medium",
         assigned_to: "",
         due_date: undefined,
+        files: [],
     });
 
     useEffect(() => {
@@ -71,6 +73,7 @@ export function TaskFormDialog({
                 due_date: initialData.due_date ? new Date(initialData.due_date) : undefined,
                 related_entity_type: initialData.related_entity_type || undefined,
                 related_entity_id: initialData.related_entity_id || undefined,
+                files: [],
             });
         } else if (!open) {
             setFormData({
@@ -80,6 +83,7 @@ export function TaskFormDialog({
                 priority: "medium",
                 assigned_to: "",
                 due_date: undefined,
+                files: [],
             });
         }
     }, [initialData, open]);
@@ -97,6 +101,28 @@ export function TaskFormDialog({
         }
     };
 
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newFiles = Array.from(e.target.files || []);
+        setFormData((prev) => ({
+            ...prev,
+            files: [...(prev.files || []), ...newFiles],
+        }));
+        if (fileInputRef.current) fileInputRef.current.value = "";
+    };
+
+    const removeFile = (index: number) => {
+        setFormData((prev) => ({
+            ...prev,
+            files: (prev.files || []).filter((_, i) => i !== index),
+        }));
+    };
+
+    const formatFileSize = (bytes: number) => {
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    };
+
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -107,7 +133,7 @@ export function TaskFormDialog({
                     </Button>
                 )}
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
                         <DialogTitle>{initialData ? "Editar Tarefa" : "Nova Tarefa"}</DialogTitle>
@@ -232,6 +258,57 @@ export function TaskFormDialog({
                                     />
                                 </PopoverContent>
                             </Popover>
+                        </div>
+
+                        {/* Anexos */}
+                        <div className="grid gap-2">
+                            <Label>Anexos</Label>
+                            <div
+                                className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors"
+                                onClick={() => fileInputRef.current?.click()}
+                            >
+                                <Paperclip className="h-5 w-5 mx-auto mb-2 text-muted-foreground" />
+                                <p className="text-sm text-muted-foreground">
+                                    Clique para anexar documentos
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    PDF, DOC, XLS, imagens (máx. 10MB cada)
+                                </p>
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    multiple
+                                    className="hidden"
+                                    onChange={handleFileChange}
+                                    accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif,.csv,.txt"
+                                />
+                            </div>
+
+                            {formData.files && formData.files.length > 0 && (
+                                <div className="space-y-2 mt-2">
+                                    {formData.files.map((file, idx) => (
+                                        <div
+                                            key={idx}
+                                            className="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2"
+                                        >
+                                            <FileIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium truncate">{file.name}</p>
+                                                <p className="text-xs text-muted-foreground">
+                                                    {formatFileSize(file.size)}
+                                                </p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => removeFile(idx)}
+                                                className="text-muted-foreground hover:text-destructive transition-colors"
+                                            >
+                                                <X className="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
                     <DialogFooter>

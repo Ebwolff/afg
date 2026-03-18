@@ -1,6 +1,19 @@
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 export type TaskPriority = 'low' | 'medium' | 'high';
 export type RelatedEntityType = 'atendimento' | 'cliente' | 'transacao' | 'servico';
+export type AttachmentPhase = 'creation' | 'completion';
+
+export interface TaskAttachment {
+    id: string;
+    task_id: string;
+    uploaded_by: string | null;
+    file_name: string;
+    file_path: string;
+    file_size: number;
+    file_type: string | null;
+    phase: AttachmentPhase;
+    created_at: string;
+}
 
 export interface Task {
     id: string;
@@ -11,6 +24,8 @@ export interface Task {
     due_date: string | null;
     assigned_to: string | null;
     created_by: string | null;
+    completion_notes: string | null;
+    completed_at: string | null;
     related_entity_type: RelatedEntityType | null;
     related_entity_id: string | null;
     created_at: string;
@@ -24,6 +39,8 @@ export interface Task {
         nome: string;
         email: string;
     };
+    // Loaded separately
+    attachments?: TaskAttachment[];
 }
 
 export interface TaskFormData {
@@ -35,6 +52,7 @@ export interface TaskFormData {
     assigned_to: string;
     related_entity_type?: RelatedEntityType;
     related_entity_id?: string;
+    files?: File[];
 }
 
 export interface Notification {

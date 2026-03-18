@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Task, TaskFormData } from "../types";
+import { Task, TaskFormData, TaskAttachment } from "../types";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
 
 const PRIORITY_LABELS: Record<string, string> = {
     low: "Baixa",
@@ -43,7 +44,51 @@ async function sendTaskNotification(
     });
 }
 
-import { useAuth } from "@/hooks/useAuth";
+async function uploadTaskFiles(taskId: string, files: File[], phase: "creation" | "completion") {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    for (const file of files) {
+        const ext = file.name.split(".").pop() || "";
+        const filePath = `tasks/${taskId}/${phase}/${Date.now()}_${file.name}`;
+
+        const { error: uploadError } = await supabase.storage
+            .from("task-attachments")
+            .upload(filePath, file);
+
+        if (uploadError) {
+            console.error("Upload error:", uploadError);
+            continue;
+        }
+
+        await supabase.from("task_attachments").insert({
+            task_id: taskId,
+            uploaded_by: user.id,
+            file_name: file.name,
+            file_path: filePath,
+            file_size: file.size,
+            file_type: file.type || ext,
+            phase,
+        });
+    }
+}
+
+export function useTaskAttachments(taskId: string | undefined) {
+    return useQuery({
+        queryKey: ["task-attachments", taskId],
+        queryFn: async () => {
+            if (!taskId) return [];
+            const { data, error } = await supabase
+                .from("task_attachments")
+                .select("*")
+                .eq("task_id", taskId)
+                .order("created_at", { ascending: true });
+            if (error) throw error;
+            return (data || []) as TaskAttachment[];
+        },
+        enabled: !!taskId,
+    });
+}
 
 export function useTasks() {
     const queryClient = useQueryClient();
@@ -90,6 +135,11 @@ export function useTasks() {
 
             if (error) throw error;
 
+            // Upload anexos da criação
+            if (newTask.files && newTask.files.length > 0) {
+                await uploadTaskFiles(data.id, newTask.files, "creation");
+            }
+
             if (newTask.assigned_to) {
                 await sendTaskNotification(
                     newTask.assigned_to,
@@ -111,13 +161,14 @@ export function useTasks() {
     });
 
     const updateTask = useMutation({
-        mutationFn: async ({ id, updates }: { id: string; updates: Partial<TaskFormData> & { status?: string } }) => {
-            const payload: Record<string, unknown> = {
-                ...updates,
-                due_date: updates.due_date?.toISOString(),
-            };
+        mutationFn: async ({ id, updates }: { id: string; updates: Partial<TaskFormData> & { status?: string; completion_notes?: string } }) => {
+            const payload: Record<string, unknown> = { ...updates };
+            delete payload.files;
 
-            // Preencher completed_at ao marcar como concluída
+            if (updates.due_date) {
+                payload.due_date = updates.due_date.toISOString();
+            }
+
             if (updates.status === "completed") {
                 payload.completed_at = new Date().toISOString();
             }
@@ -130,6 +181,11 @@ export function useTasks() {
                 .single();
 
             if (error) throw error;
+
+            // Upload anexos de conclusão
+            if (updates.files && updates.files.length > 0) {
+                await uploadTaskFiles(id, updates.files, "completion");
+            }
 
             if (updates.assigned_to) {
                 await sendTaskNotification(
@@ -144,6 +200,7 @@ export function useTasks() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["tasks"] });
+            queryClient.invalidateQueries({ queryKey: ["task-attachments"] });
             toast.success("Tarefa atualizada!");
         },
         onError: () => {
@@ -174,4 +231,3 @@ export function useTasks() {
         deleteTask,
     };
 }
-

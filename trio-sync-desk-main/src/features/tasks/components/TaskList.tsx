@@ -1,42 +1,32 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
+    Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
+    DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
+    AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+    AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
+    Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { MoreHorizontal, Pencil, Trash2, CheckCircle2, CalendarDays, User, Flag, Clock } from "lucide-react";
-import { Task, TaskPriority, TaskStatus } from "../types";
+import {
+    MoreHorizontal, Pencil, Trash2, CheckCircle2, CalendarDays, User,
+    Flag, Clock, Paperclip, FileIcon, Download, Play, X, Loader2,
+} from "lucide-react";
+import { Task, TaskPriority, TaskStatus, TaskAttachment } from "../types";
 import { TaskFormDialog } from "./TaskFormDialog";
+import { useTaskAttachments } from "../hooks/useTasks";
+import { supabase } from "@/integrations/supabase/client";
 
 interface TaskListProps {
     tasks: Task[] | undefined;
@@ -58,13 +48,101 @@ const STATUS_CONFIG: Record<TaskStatus, { label: string; variant: "default" | "s
     cancelled: { label: "Cancelada", variant: "destructive" },
 };
 
+function formatFileSize(bytes: number) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function AttachmentList({ attachments, phase }: { attachments: TaskAttachment[]; phase: string }) {
+    const filtered = attachments.filter((a) => a.phase === phase);
+    if (filtered.length === 0) return null;
+
+    const handleDownload = async (att: TaskAttachment) => {
+        const { data } = await supabase.storage
+            .from("task-attachments")
+            .createSignedUrl(att.file_path, 300);
+        if (data?.signedUrl) {
+            window.open(data.signedUrl, "_blank");
+        }
+    };
+
+    return (
+        <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                {phase === "creation" ? "📎 Anexos da Criação" : "📄 Anexos de Conclusão"}
+            </p>
+            {filtered.map((att) => (
+                <div
+                    key={att.id}
+                    className="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2 group"
+                >
+                    <FileIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{att.file_name}</p>
+                        <p className="text-xs text-muted-foreground">{formatFileSize(att.file_size)}</p>
+                    </div>
+                    <button
+                        onClick={() => handleDownload(att)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-primary"
+                    >
+                        <Download className="h-4 w-4" />
+                    </button>
+                </div>
+            ))}
+        </div>
+    );
+}
+
 export function TaskList({ tasks, isLoading, onDelete, onUpdate }: TaskListProps) {
     const [editingTask, setEditingTask] = useState<Task | null>(null);
     const [viewingTask, setViewingTask] = useState<Task | null>(null);
+    const [completingTask, setCompletingTask] = useState<Task | null>(null);
+    const [completionNotes, setCompletionNotes] = useState("");
+    const [completionFiles, setCompletionFiles] = useState<File[]>([]);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const { data: viewAttachments } = useTaskAttachments(viewingTask?.id);
 
     const getStatusBadge = (status: TaskStatus) => {
         const cfg = STATUS_CONFIG[status];
         return <Badge variant={cfg.variant}>{cfg.label}</Badge>;
+    };
+
+    const handleStartTask = (task: Task) => {
+        onUpdate(task.id, { status: "in_progress" });
+    };
+
+    const openCompleteDialog = (task: Task) => {
+        setCompletingTask(task);
+        setCompletionNotes("");
+        setCompletionFiles([]);
+    };
+
+    const handleCompleteTask = async () => {
+        if (!completingTask) return;
+        setIsSubmitting(true);
+        try {
+            await onUpdate(completingTask.id, {
+                status: "completed",
+                completion_notes: completionNotes || null,
+                files: completionFiles.length > 0 ? completionFiles : undefined,
+            });
+            setCompletingTask(null);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleCompletionFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newFiles = Array.from(e.target.files || []);
+        setCompletionFiles((prev) => [...prev, ...newFiles]);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+    };
+
+    const removeCompletionFile = (index: number) => {
+        setCompletionFiles((prev) => prev.filter((_, i) => i !== index));
     };
 
     if (isLoading) {
@@ -146,10 +224,16 @@ export function TaskList({ tasks, isLoading, onDelete, onUpdate }: TaskListProps
                                                 <Pencil className="mr-2 h-4 w-4" />
                                                 Editar
                                             </DropdownMenuItem>
-                                            {task.status !== "completed" && (
-                                                <DropdownMenuItem onClick={() => onUpdate(task.id, { status: "completed" })}>
+                                            {task.status === "pending" && (
+                                                <DropdownMenuItem onClick={() => handleStartTask(task)}>
+                                                    <Play className="mr-2 h-4 w-4" />
+                                                    Iniciar Tarefa
+                                                </DropdownMenuItem>
+                                            )}
+                                            {(task.status === "pending" || task.status === "in_progress") && (
+                                                <DropdownMenuItem onClick={() => openCompleteDialog(task)}>
                                                     <CheckCircle2 className="mr-2 h-4 w-4" />
-                                                    Marcar com Concluída
+                                                    Concluir Tarefa
                                                 </DropdownMenuItem>
                                             )}
                                             <AlertDialog>
@@ -185,7 +269,7 @@ export function TaskList({ tasks, isLoading, onDelete, onUpdate }: TaskListProps
 
             {/* Task Detail Modal */}
             <Dialog open={!!viewingTask} onOpenChange={(open) => !open && setViewingTask(null)}>
-                <DialogContent className="max-w-lg">
+                <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle className="text-xl">{viewingTask?.title}</DialogTitle>
                     </DialogHeader>
@@ -236,6 +320,59 @@ export function TaskList({ tasks, isLoading, onDelete, onUpdate }: TaskListProps
                                 </div>
                             </div>
 
+                            {/* Notas de conclusão */}
+                            {viewingTask.completion_notes && (
+                                <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/30 p-4">
+                                    <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400 mb-1">
+                                        Notas de Conclusão
+                                    </p>
+                                    <p className="text-sm whitespace-pre-wrap">{viewingTask.completion_notes}</p>
+                                </div>
+                            )}
+
+                            {/* Anexos */}
+                            {viewAttachments && viewAttachments.length > 0 && (
+                                <div className="space-y-3 border-t pt-4">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <Paperclip className="h-4 w-4 text-muted-foreground" />
+                                        <span className="text-sm font-medium">
+                                            Anexos ({viewAttachments.length})
+                                        </span>
+                                    </div>
+                                    <AttachmentList attachments={viewAttachments} phase="creation" />
+                                    <AttachmentList attachments={viewAttachments} phase="completion" />
+                                </div>
+                            )}
+
+                            {/* Actions */}
+                            {(viewingTask.status === "pending" || viewingTask.status === "in_progress") && (
+                                <div className="border-t pt-4 flex gap-2">
+                                    {viewingTask.status === "pending" && (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => {
+                                                handleStartTask(viewingTask);
+                                                setViewingTask(null);
+                                            }}
+                                        >
+                                            <Play className="mr-2 h-4 w-4" />
+                                            Iniciar Tarefa
+                                        </Button>
+                                    )}
+                                    <Button
+                                        size="sm"
+                                        onClick={() => {
+                                            setViewingTask(null);
+                                            openCompleteDialog(viewingTask);
+                                        }}
+                                    >
+                                        <CheckCircle2 className="mr-2 h-4 w-4" />
+                                        Concluir Tarefa
+                                    </Button>
+                                </div>
+                            )}
+
                             <div className="border-t pt-4 flex items-center justify-between text-xs text-muted-foreground">
                                 <span>
                                     Criada por: {viewingTask.creator?.nome || "—"} em{" "}
@@ -244,6 +381,96 @@ export function TaskList({ tasks, isLoading, onDelete, onUpdate }: TaskListProps
                             </div>
                         </div>
                     )}
+                </DialogContent>
+            </Dialog>
+
+            {/* Complete Task Dialog */}
+            <Dialog open={!!completingTask} onOpenChange={(open) => !open && setCompletingTask(null)}>
+                <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                            Concluir Tarefa
+                        </DialogTitle>
+                    </DialogHeader>
+                    {completingTask && (
+                        <div className="space-y-4">
+                            <div className="rounded-lg bg-muted/50 p-3">
+                                <p className="font-medium">{completingTask.title}</p>
+                                {completingTask.description && (
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                        {completingTask.description}
+                                    </p>
+                                )}
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Notas de Conclusão (opcional)</Label>
+                                <Textarea
+                                    value={completionNotes}
+                                    onChange={(e) => setCompletionNotes(e.target.value)}
+                                    placeholder="Descreva o que foi feito, resultados obtidos..."
+                                    rows={4}
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Anexar Documentos de Conclusão (opcional)</Label>
+                                <div
+                                    className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors"
+                                    onClick={() => fileInputRef.current?.click()}
+                                >
+                                    <Paperclip className="h-5 w-5 mx-auto mb-2 text-muted-foreground" />
+                                    <p className="text-sm text-muted-foreground">
+                                        Clique para anexar comprovantes
+                                    </p>
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        multiple
+                                        className="hidden"
+                                        onChange={handleCompletionFileChange}
+                                        accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif,.csv,.txt"
+                                    />
+                                </div>
+
+                                {completionFiles.length > 0 && (
+                                    <div className="space-y-2">
+                                        {completionFiles.map((file, idx) => (
+                                            <div
+                                                key={idx}
+                                                className="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2"
+                                            >
+                                                <FileIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-medium truncate">{file.name}</p>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {formatFileSize(file.size)}
+                                                    </p>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeCompletionFile(idx)}
+                                                    className="text-muted-foreground hover:text-destructive"
+                                                >
+                                                    <X className="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setCompletingTask(null)}>
+                            Cancelar
+                        </Button>
+                        <Button onClick={handleCompleteTask} disabled={isSubmitting}>
+                            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Confirmar Conclusão
+                        </Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
 
@@ -265,4 +492,3 @@ export function TaskList({ tasks, isLoading, onDelete, onUpdate }: TaskListProps
         </>
     );
 }
-
