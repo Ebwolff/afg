@@ -32,6 +32,7 @@ const TasksPage = lazy(() => import("./features/tasks/pages/TasksPage"));
 const Produtividade = lazy(() => import("./pages/Produtividade"));
 const LeadsPage = lazy(() => import("./features/leads/pages/LeadsPage"));
 const Administracao = lazy(() => import("./pages/Administracao"));
+const AuditLogs = lazy(() => import("./pages/AuditLogs"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -79,6 +80,7 @@ const App = () => (
                   <Route path="/relatorios" element={<ProtectedRoute requiredPermission="relatorios"><Relatorios /></ProtectedRoute>} />
                   <Route path="/banners" element={<ProtectedRoute requiredPermission="banners"><Banners /></ProtectedRoute>} />
                   <Route path="/admin" element={<ProtectedRoute><Administracao /></ProtectedRoute>} />
+                  <Route path="/admin/logs" element={<ProtectedRoute><AuditLogs /></ProtectedRoute>} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>

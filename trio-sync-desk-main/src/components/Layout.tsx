@@ -196,6 +196,38 @@ export function Layout({ children }: LayoutProps) {
                                     }
                                     return adminLink;
                                 })()}
+                                {(() => {
+                                    const isActive = location.pathname === "/admin/logs";
+                                    const logsLink = (
+                                        <button
+                                            onClick={() => navigate("/admin/logs")}
+                                            className={`
+                                                w-full flex items-center gap-3 rounded-lg px-3 py-2.5
+                                                text-sm font-medium transition-colors
+                                                ${isActive
+                                                    ? "bg-primary text-primary-foreground shadow-sm"
+                                                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                                                }
+                                                ${collapsed ? "justify-center px-2" : ""}
+                                            `}
+                                        >
+                                            <FileText className={`shrink-0 ${collapsed ? "h-5 w-5" : "h-4 w-4"}`} />
+                                            {!collapsed && <span>Logs</span>}
+                                        </button>
+                                    );
+
+                                    if (collapsed) {
+                                        return (
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>{logsLink}</TooltipTrigger>
+                                                <TooltipContent side="right" sideOffset={8}>
+                                                    Logs de Auditoria
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        );
+                                    }
+                                    return logsLink;
+                                })()}
                             </>
                         )}
                     </TooltipProvider>
