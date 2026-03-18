@@ -1,105 +1,281 @@
-import { ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
-import { LayoutDashboard, Users, UserCircle, Package, Calendar, DollarSign, LogOut, Calculator, FileText, ArrowDownCircle, ArrowUpCircle, Image, CheckSquare, Target, Shield, TrendingUp, LucideIcon } from "lucide-react";
+import { ReactNode, useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import {
+    LayoutDashboard, Users, UserCircle, Package, Calendar, DollarSign,
+    LogOut, Calculator, FileText, ArrowDownCircle, ArrowUpCircle, Image,
+    CheckSquare, Target, Shield, TrendingUp, LucideIcon, Menu, X,
+    ChevronLeft, ChevronRight,
+} from "lucide-react";
 import { Button } from "./ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "./ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { NavLink } from "./NavLink";
 import logo from "@/assets/logo.jpg";
 import { NotificationPopover } from "@/features/notifications/components/NotificationPopover";
 import { useAuth, AppPermission } from "@/hooks/useAuth";
 import { useDueDateNotifier } from "@/hooks/useDueDateNotifier";
+import { useNativeNotifications } from "@/hooks/useNativeNotifications";
 
 interface LayoutProps {
-  children: ReactNode;
+    children: ReactNode;
 }
 
 interface NavItem {
-  to: string;
-  icon: LucideIcon;
-  label: string;
-  permission: AppPermission;
+    to: string;
+    icon: LucideIcon;
+    label: string;
+    permission: AppPermission;
 }
 
 const navItems: NavItem[] = [
-  { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard", permission: "dashboard" },
-  { to: "/leads", icon: Target, label: "Leads", permission: "leads" },
-  { to: "/tasks", icon: CheckSquare, label: "Tarefas", permission: "tasks" },
-  { to: "/produtividade", icon: TrendingUp, label: "Produtividade", permission: "produtividade" },
-  { to: "/atendimentos", icon: Users, label: "Atendimentos", permission: "atendimentos" },
-  { to: "/clientes", icon: UserCircle, label: "Clientes", permission: "clientes" },
-  { to: "/produtos", icon: Package, label: "Produtos", permission: "produtos" },
-  { to: "/contas-pagar", icon: ArrowDownCircle, label: "Contas a Pagar", permission: "contas_pagar" },
-  { to: "/contas-receber", icon: ArrowUpCircle, label: "Contas a Receber", permission: "contas_receber" },
-  { to: "/financeiro", icon: DollarSign, label: "Financeiro", permission: "financeiro" },
-  { to: "/simulador", icon: Calculator, label: "Simulador", permission: "simulador" },
-  { to: "/agenda", icon: Calendar, label: "Agenda", permission: "agenda" },
-  { to: "/relatorios", icon: FileText, label: "Relatórios", permission: "relatorios" },
-  { to: "/banners", icon: Image, label: "Banners", permission: "banners" },
+    { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard", permission: "dashboard" },
+    { to: "/leads", icon: Target, label: "Leads", permission: "leads" },
+    { to: "/tasks", icon: CheckSquare, label: "Tarefas", permission: "tasks" },
+    { to: "/produtividade", icon: TrendingUp, label: "Produtividade", permission: "produtividade" },
+    { to: "/atendimentos", icon: Users, label: "Atendimentos", permission: "atendimentos" },
+    { to: "/clientes", icon: UserCircle, label: "Clientes", permission: "clientes" },
+    { to: "/produtos", icon: Package, label: "Produtos", permission: "produtos" },
+    { to: "/contas-pagar", icon: ArrowDownCircle, label: "Contas a Pagar", permission: "contas_pagar" },
+    { to: "/contas-receber", icon: ArrowUpCircle, label: "Contas a Receber", permission: "contas_receber" },
+    { to: "/financeiro", icon: DollarSign, label: "Financeiro", permission: "financeiro" },
+    { to: "/simulador", icon: Calculator, label: "Simulador", permission: "simulador" },
+    { to: "/agenda", icon: Calendar, label: "Agenda", permission: "agenda" },
+    { to: "/relatorios", icon: FileText, label: "Relatórios", permission: "relatorios" },
+    { to: "/banners", icon: Image, label: "Banners", permission: "banners" },
 ];
 
+const SIDEBAR_KEY = "afg-sidebar-collapsed";
+
 export function Layout({ children }: LayoutProps) {
-  const navigate = useNavigate();
-  const { toast } = useToast();
-  const { hasPermission, isAdmin } = useAuth();
-  useDueDateNotifier();
+    const navigate = useNavigate();
+    const location = useLocation();
+    const { toast } = useToast();
+    const { hasPermission, isAdmin, profile } = useAuth();
+    useDueDateNotifier();
+    useNativeNotifications();
 
-  const handleLogout = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      toast({
-        title: "Erro ao sair",
-        description: error.message,
-        variant: "destructive",
-      });
-    } else {
-      navigate("/auth");
-    }
-  };
+    const [collapsed, setCollapsed] = useState(() => {
+        try { return localStorage.getItem(SIDEBAR_KEY) === "true"; } catch { return false; }
+    });
+    const [mobileOpen, setMobileOpen] = useState(false);
 
-  const visibleItems = navItems.filter((item) => hasPermission(item.permission));
+    // Save preference
+    useEffect(() => {
+        try { localStorage.setItem(SIDEBAR_KEY, String(collapsed)); } catch { /* noop */ }
+    }, [collapsed]);
 
-  return (
-    <div className="min-h-screen bg-background">
-      <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-sidebar-border bg-sidebar-background">
-        <div className="flex h-20 items-center justify-center border-b border-sidebar-border px-4 bg-background">
-          <img src={logo} alt="AFG Soluções Financeiras" className="h-14 w-auto object-contain" />
-        </div>
-        <div className="flex flex-col h-[calc(100%-5rem)]">
-          <nav className="flex-1 space-y-1 p-4 overflow-y-auto">
-            {visibleItems.map((item) => (
-              <NavLink key={item.to} to={item.to} icon={item.icon}>
-                {item.label}
-              </NavLink>
-            ))}
-            {isAdmin && (
-              <>
-                <div className="my-3 border-t border-sidebar-border" />
-                <NavLink to="/admin" icon={Shield}>
-                  Administração
-                </NavLink>
-              </>
+    // Close mobile drawer on navigation
+    useEffect(() => {
+        setMobileOpen(false);
+    }, [location.pathname]);
+
+    const handleLogout = async () => {
+        const { error } = await supabase.auth.signOut();
+        if (error) {
+            toast({ title: "Erro ao sair", description: error.message, variant: "destructive" });
+        } else {
+            navigate("/auth");
+        }
+    };
+
+    const visibleItems = navItems.filter((item) => hasPermission(item.permission));
+    const sidebarWidth = collapsed ? "w-[68px]" : "w-64";
+    const contentMargin = collapsed ? "lg:ml-[68px]" : "lg:ml-64";
+
+    return (
+        <div className="min-h-screen bg-background">
+            {/* ── Mobile overlay ── */}
+            {mobileOpen && (
+                <div
+                    className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+                    onClick={() => setMobileOpen(false)}
+                />
             )}
-          </nav>
-          <div className="border-t border-sidebar-border p-4">
-            <Button
-              variant="ghost"
-              className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              onClick={handleLogout}
-            >
-              <LogOut className="mr-3 h-5 w-5" />
-              Sair
-            </Button>
-          </div>
-        </div>
-      </aside>
-      <main className="ml-64">
-        <div className="flex justify-end items-center px-8 py-4 border-b bg-white">
-          <NotificationPopover />
-        </div>
-        <div className="container mx-auto p-8">{children}</div>
-      </main>
-    </div>
-  );
-}
 
+            {/* ── Sidebar ── */}
+            <aside
+                className={`
+                    fixed top-0 left-0 z-50 h-screen border-r border-border bg-card
+                    transition-all duration-300 ease-in-out
+                    ${sidebarWidth}
+                    ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
+                    lg:translate-x-0
+                `}
+            >
+                {/* Logo area */}
+                <div className={`flex h-16 items-center border-b border-border ${collapsed ? "justify-center px-2" : "justify-between px-4"}`}>
+                    {!collapsed && (
+                        <img src={logo} alt="AFG" className="h-10 w-auto object-contain" />
+                    )}
+                    {collapsed && (
+                        <img src={logo} alt="AFG" className="h-8 w-8 rounded object-cover" />
+                    )}
+                    {/* Close button on mobile */}
+                    <button
+                        className="lg:hidden p-1 rounded hover:bg-muted"
+                        onClick={() => setMobileOpen(false)}
+                    >
+                        <X className="h-5 w-5" />
+                    </button>
+                </div>
+
+                {/* Nav items */}
+                <nav className="flex-1 overflow-y-auto p-2 space-y-1" style={{ height: "calc(100% - 4rem - 7rem)" }}>
+                    <TooltipProvider delayDuration={0}>
+                        {visibleItems.map((item) => {
+                            const isActive = location.pathname === item.to;
+                            const link = (
+                                <button
+                                    key={item.to}
+                                    onClick={() => navigate(item.to)}
+                                    className={`
+                                        w-full flex items-center gap-3 rounded-lg px-3 py-2.5
+                                        text-sm font-medium transition-colors
+                                        ${isActive
+                                            ? "bg-primary text-primary-foreground shadow-sm"
+                                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                                        }
+                                        ${collapsed ? "justify-center px-2" : ""}
+                                    `}
+                                >
+                                    <item.icon className={`shrink-0 ${collapsed ? "h-5 w-5" : "h-4 w-4"}`} />
+                                    {!collapsed && <span className="truncate">{item.label}</span>}
+                                </button>
+                            );
+
+                            if (collapsed) {
+                                return (
+                                    <Tooltip key={item.to}>
+                                        <TooltipTrigger asChild>{link}</TooltipTrigger>
+                                        <TooltipContent side="right" sideOffset={8}>
+                                            {item.label}
+                                        </TooltipContent>
+                                    </Tooltip>
+                                );
+                            }
+                            return link;
+                        })}
+
+                        {isAdmin && (
+                            <>
+                                <div className="my-2 border-t border-border" />
+                                {(() => {
+                                    const isActive = location.pathname === "/admin";
+                                    const adminLink = (
+                                        <button
+                                            onClick={() => navigate("/admin")}
+                                            className={`
+                                                w-full flex items-center gap-3 rounded-lg px-3 py-2.5
+                                                text-sm font-medium transition-colors
+                                                ${isActive
+                                                    ? "bg-primary text-primary-foreground shadow-sm"
+                                                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                                                }
+                                                ${collapsed ? "justify-center px-2" : ""}
+                                            `}
+                                        >
+                                            <Shield className={`shrink-0 ${collapsed ? "h-5 w-5" : "h-4 w-4"}`} />
+                                            {!collapsed && <span>Administração</span>}
+                                        </button>
+                                    );
+
+                                    if (collapsed) {
+                                        return (
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>{adminLink}</TooltipTrigger>
+                                                <TooltipContent side="right" sideOffset={8}>
+                                                    Administração
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        );
+                                    }
+                                    return adminLink;
+                                })()}
+                            </>
+                        )}
+                    </TooltipProvider>
+                </nav>
+
+                {/* Bottom area */}
+                <div className="border-t border-border p-2 space-y-1">
+                    {/* Toggle button - desktop only */}
+                    <button
+                        onClick={() => setCollapsed(!collapsed)}
+                        className="hidden lg:flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors justify-center"
+                    >
+                        {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+                        {!collapsed && <span className="truncate">Recolher menu</span>}
+                    </button>
+
+                    {/* Logout */}
+                    {(() => {
+                        const logoutBtn = (
+                            <button
+                                onClick={handleLogout}
+                                className={`
+                                    w-full flex items-center gap-3 rounded-lg px-3 py-2.5
+                                    text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors
+                                    ${collapsed ? "justify-center px-2" : ""}
+                                `}
+                            >
+                                <LogOut className={`shrink-0 ${collapsed ? "h-5 w-5" : "h-4 w-4"}`} />
+                                {!collapsed && <span>Sair</span>}
+                            </button>
+                        );
+
+                        if (collapsed) {
+                            return (
+                                <TooltipProvider delayDuration={0}>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>{logoutBtn}</TooltipTrigger>
+                                        <TooltipContent side="right" sideOffset={8}>
+                                            Sair
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
+                            );
+                        }
+                        return logoutBtn;
+                    })()}
+                </div>
+            </aside>
+
+            {/* ── Main content ── */}
+            <div className={`transition-all duration-300 ${contentMargin}`}>
+                {/* Topbar */}
+                <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-4 sm:px-6 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+                    {/* Left: hamburger (mobile) + breadcrumb */}
+                    <div className="flex items-center gap-3">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="lg:hidden"
+                            onClick={() => setMobileOpen(true)}
+                        >
+                            <Menu className="h-5 w-5" />
+                        </Button>
+                        <img src={logo} alt="AFG" className="h-8 w-auto object-contain lg:hidden" />
+                    </div>
+
+                    {/* Right: notifications + user */}
+                    <div className="flex items-center gap-3">
+                        <NotificationPopover />
+                        {profile && (
+                            <div className="hidden sm:flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                                    {profile.nome?.charAt(0)?.toUpperCase() || "U"}
+                                </div>
+                                <span className="text-sm font-medium truncate max-w-[120px]">{profile.nome}</span>
+                            </div>
+                        )}
+                    </div>
+                </header>
+
+                {/* Page content */}
+                <div className="p-4 sm:p-6 lg:p-8">
+                    {children}
+                </div>
+            </div>
+        </div>
+    );
+}
