@@ -2,14 +2,15 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { subMonths, startOfMonth, endOfMonth, addDays, isAfter, isBefore, parseISO, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-
 import { handleSupabaseError } from "@/integrations/supabase/error-handler";
 
 export function useDashboardData() {
     const { data: transacoes, isLoading: loadingTransacoes } = useQuery({
         queryKey: ["transacoes-summary"],
         queryFn: async () => {
-            const { data, error } = await supabase.from("transacoes").select("*");
+            const { data, error } = await supabase
+                .from("transacoes")
+                .select("id, tipo, valor, status, data_vencimento, data_pagamento, created_at");
             if (error) handleSupabaseError(error, "Erro ao carregar transações");
             return data;
         },
@@ -38,6 +39,30 @@ export function useDashboardData() {
         },
     });
 
+    // Tarefas pendentes e atrasadas
+    const { data: tasksData, isLoading: loadingTasks } = useQuery({
+        queryKey: ["dashboard-tasks"],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from("tasks")
+                .select("id, status, due_date, assigned_to, completed_at");
+            if (error) handleSupabaseError(error, "Erro ao carregar tarefas");
+            return data || [];
+        },
+    });
+
+    // Top 5 produtividade (mini ranking)
+    const { data: teamData, isLoading: loadingTeam } = useQuery({
+        queryKey: ["dashboard-team"],
+        queryFn: async () => {
+            const { data: profiles, error } = await supabase
+                .from("profiles")
+                .select("id, nome");
+            if (error) handleSupabaseError(error, "Erro ao carregar equipe");
+            return profiles || [];
+        },
+    });
+
     const calcularSaldo = () => {
         if (!transacoes) return { entradas: 0, saidas: 0, saldo: 0 };
         const entradas = transacoes
@@ -46,7 +71,6 @@ export function useDashboardData() {
         const saidas = transacoes
             .filter((t) => t.tipo === "despesa")
             .reduce((acc, t) => acc + Number(t.valor), 0);
-
         return { entradas, saidas, saldo: entradas - saidas };
     };
 
@@ -113,7 +137,6 @@ export function useDashboardData() {
 
     const getAlertasVencimento = () => {
         if (!transacoes) return { vencidas: 0, vencendo: 0, valorVencido: 0 };
-
         const hoje = new Date();
         const em7Dias = addDays(hoje, 7);
 
@@ -135,22 +158,72 @@ export function useDashboardData() {
         );
 
         const valorVencido = vencidas.reduce((acc, c) => acc + Number(c.valor), 0);
+        return { vencidas: vencidas.length, vencendo: vencendo.length, valorVencido };
+    };
+
+    // KPIs de tarefas
+    const getTasksKPIs = () => {
+        if (!tasksData) return { total: 0, pending: 0, overdue: 0, completedThisMonth: 0 };
+        const hoje = new Date();
+        const mesAtual = startOfMonth(hoje);
+
+        const pending = tasksData.filter((t) => t.status === "pending" || t.status === "in_progress");
+        const overdue = pending.filter((t) => t.due_date && isBefore(parseISO(t.due_date), hoje));
+        const completedThisMonth = tasksData.filter(
+            (t) => t.status === "completed" && t.completed_at && new Date(t.completed_at) >= mesAtual
+        );
 
         return {
-            vencidas: vencidas.length,
-            vencendo: vencendo.length,
-            valorVencido,
+            total: tasksData.length,
+            pending: pending.length,
+            overdue: overdue.length,
+            completedThisMonth: completedThisMonth.length,
         };
     };
 
+    // Mini ranking da equipe (baseado em tarefas concluídas no mês)
+    const getTeamRanking = () => {
+        if (!tasksData || !teamData) return [];
+        const hoje = new Date();
+        const mesAtual = startOfMonth(hoje);
+
+        const completedThisMonth = tasksData.filter(
+            (t) => t.status === "completed" && t.completed_at && new Date(t.completed_at) >= mesAtual
+        );
+
+        const countByUser: Record<string, number> = {};
+        completedThisMonth.forEach((t) => {
+            if (t.assigned_to) {
+                countByUser[t.assigned_to] = (countByUser[t.assigned_to] || 0) + 1;
+            }
+        });
+
+        return teamData
+            .filter((p) => countByUser[p.id])
+            .map((p) => ({ id: p.id, nome: p.nome, completed: countByUser[p.id] }))
+            .sort((a, b) => b.completed - a.completed)
+            .slice(0, 5);
+    };
+
+    // Ticket médio
+    const getTicketMedio = () => {
+        if (!transacoes) return 0;
+        const receitas = transacoes.filter((t) => t.tipo === "receita");
+        if (receitas.length === 0) return 0;
+        return receitas.reduce((acc, t) => acc + Number(t.valor), 0) / receitas.length;
+    };
+
     return {
-        loading: loadingTransacoes || loadingClientes || loadingAtendimentos,
+        loading: loadingTransacoes || loadingClientes || loadingAtendimentos || loadingTasks || loadingTeam,
         saldo: calcularSaldo(),
         statusData: getStatusData(),
         fluxoData: getFluxoCaixaData(),
         alertas: getAlertasVencimento(),
         clientesCount,
         atendimentosCount,
+        tasksKPIs: getTasksKPIs(),
+        teamRanking: getTeamRanking(),
+        ticketMedio: getTicketMedio(),
         recentTransactions: transacoes?.slice(0, 5) || [],
     };
 }

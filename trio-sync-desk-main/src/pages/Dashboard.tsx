@@ -3,8 +3,7 @@ import { useDashboardData } from "@/features/dashboard/hooks/useDashboardData";
 import { DashboardSummaryCards } from "@/features/dashboard/components/DashboardSummaryCards";
 import { DashboardCharts } from "@/features/dashboard/components/DashboardCharts";
 import { DashboardAlerts } from "@/features/dashboard/components/DashboardAlerts";
-
-
+import { TeamRanking } from "@/features/dashboard/components/TeamRanking";
 import { DashboardSkeleton } from "@/components/skeletons/DashboardSkeleton";
 
 export default function Dashboard() {
@@ -16,9 +15,10 @@ export default function Dashboard() {
     fluxoData,
     statusData,
     alertas,
+    tasksKPIs,
+    teamRanking,
+    ticketMedio,
   } = useDashboardData();
-
-
 
   if (loading) {
     return (
@@ -43,19 +43,25 @@ export default function Dashboard() {
         <DashboardSummaryCards
           loading={loading}
           saldo={saldo}
-          clientesCount={clientesCount}
-          atendimentosCount={atendimentosCount}
+          clientesCount={clientesCount ?? 0}
+          atendimentosCount={atendimentosCount ?? 0}
+          tasksKPIs={tasksKPIs}
+          ticketMedio={ticketMedio}
         />
 
-        <DashboardCharts
-          loading={loading}
-          fluxoData={fluxoData}
-          statusData={statusData}
-        />
-
-
+        <div className="grid gap-4 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <DashboardCharts
+              loading={loading}
+              fluxoData={fluxoData}
+              statusData={statusData}
+            />
+          </div>
+          <div>
+            <TeamRanking loading={loading} ranking={teamRanking} />
+          </div>
+        </div>
       </div>
     </Layout>
   );
 }
-
