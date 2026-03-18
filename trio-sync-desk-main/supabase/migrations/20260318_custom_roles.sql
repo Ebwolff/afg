@@ -60,7 +60,7 @@ ALTER TABLE user_roles ADD COLUMN IF NOT EXISTS role_id UUID REFERENCES custom_r
 UPDATE user_roles ur
 SET role_id = cr.id
 FROM custom_roles cr
-WHERE ur.role = cr.name
+WHERE ur.role::text = cr.name
   AND ur.role_id IS NULL;
 
 -- 5. Tornar role_id NOT NULL após migração
