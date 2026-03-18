@@ -28,6 +28,8 @@ export function useClientes() {
                 .from("clientes")
                 .insert({
                     ...newCliente,
+                    nis: newCliente.nis || null,
+                    data_nascimento: newCliente.data_nascimento || null,
                     created_by: user?.id
                 })
                 .select()

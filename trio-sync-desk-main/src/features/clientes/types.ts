@@ -2,6 +2,8 @@ export interface Cliente {
     id: string;
     nome: string;
     cpf: string;
+    nis?: string;
+    data_nascimento?: string;
     telefone?: string;
     email?: string;
     endereco?: string;
@@ -12,6 +14,8 @@ export interface Cliente {
 export interface ClienteFormData {
     nome: string;
     cpf: string;
+    nis: string;
+    data_nascimento: string;
     telefone: string;
     email: string;
     endereco: string;

@@ -24,6 +24,8 @@ export function ClienteFormDialog({ onSubmit, isLoading }: ClienteFormDialogProp
     const [formData, setFormData] = useState<ClienteFormData>({
         nome: "",
         cpf: "",
+        nis: "",
+        data_nascimento: "",
         telefone: "",
         email: "",
         endereco: "",
@@ -36,6 +38,8 @@ export function ClienteFormDialog({ onSubmit, isLoading }: ClienteFormDialogProp
         setFormData({
             nome: "",
             cpf: "",
+            nis: "",
+            data_nascimento: "",
             telefone: "",
             email: "",
             endereco: "",
@@ -74,6 +78,24 @@ export function ClienteFormDialog({ onSubmit, isLoading }: ClienteFormDialogProp
                             value={formData.cpf}
                             onChange={(e) => setFormData({ ...formData, cpf: e.target.value })}
                             required
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="nis">Nº Cadastro / NIS</Label>
+                        <Input
+                            id="nis"
+                            value={formData.nis}
+                            onChange={(e) => setFormData({ ...formData, nis: e.target.value })}
+                            placeholder="Número de Cadastro ou NIS"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="data_nascimento">Data de Nascimento</Label>
+                        <Input
+                            id="data_nascimento"
+                            type="date"
+                            value={formData.data_nascimento}
+                            onChange={(e) => setFormData({ ...formData, data_nascimento: e.target.value })}
                         />
                     </div>
                     <div className="space-y-2">
