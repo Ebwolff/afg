@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-type TableName = 'clientes' | 'transacoes' | 'produtos' | 'atendimentos' | 'eventos';
+type TableName = 'clientes' | 'transacoes' | 'produtos' | 'atendimentos' | 'eventos' | 'tasks' | 'leads';
 
 interface UseRealtimeSubscriptionOptions {
     table: TableName;
@@ -52,6 +52,9 @@ export function useRealtimeSync() {
             { table: 'transacoes', queryKey: ['transacoes'] },
             { table: 'produtos', queryKey: ['produtos'] },
             { table: 'eventos', queryKey: ['eventos'] },
+            { table: 'atendimentos', queryKey: ['atendimentos'] },
+            { table: 'tasks', queryKey: ['tasks'] },
+            { table: 'leads', queryKey: ['leads'] },
         ];
 
         const channels = tables.map(({ table, queryKey }) => {

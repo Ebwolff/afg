@@ -79,8 +79,8 @@ const App = () => (
                   <Route path="/simulador" element={<ProtectedRoute requiredPermission="simulador"><SimuladorConsorcio /></ProtectedRoute>} />
                   <Route path="/relatorios" element={<ProtectedRoute requiredPermission="relatorios"><Relatorios /></ProtectedRoute>} />
                   <Route path="/banners" element={<ProtectedRoute requiredPermission="banners"><Banners /></ProtectedRoute>} />
-                  <Route path="/admin" element={<ProtectedRoute><Administracao /></ProtectedRoute>} />
-                  <Route path="/admin/logs" element={<ProtectedRoute><AuditLogs /></ProtectedRoute>} />
+                  <Route path="/admin" element={<ProtectedRoute requiredRole="admin"><Administracao /></ProtectedRoute>} />
+                  <Route path="/admin/logs" element={<ProtectedRoute requiredRole="admin"><AuditLogs /></ProtectedRoute>} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>

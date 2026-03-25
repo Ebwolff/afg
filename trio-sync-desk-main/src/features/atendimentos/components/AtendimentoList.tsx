@@ -74,7 +74,7 @@ export function AtendimentoList({ atendimentos, onAttend, onDelete }: Atendiment
                                 </p>
                             )}
                             <p className="text-xs text-muted-foreground">
-                                Solicitado por: {atendimento.solicitado_por?.nome}
+                                Solicitado por: {atendimento.solicitante_nome || "—"}
                             </p>
                             <div className="flex gap-2 mt-2">
                                 {atendimento.status === "aguardando" && (

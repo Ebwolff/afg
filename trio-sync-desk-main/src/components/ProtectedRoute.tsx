@@ -1,38 +1,25 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth, AppPermission } from "@/hooks/useAuth";
 import { Layout } from "@/components/Layout";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requiredPermission?: AppPermission;
+  requiredRole?: string;
 }
 
-export function ProtectedRoute({ children, requiredPermission }: ProtectedRouteProps) {
+export function ProtectedRoute({ children, requiredPermission, requiredRole }: ProtectedRouteProps) {
   const navigate = useNavigate();
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-  const { hasPermission, loading, role } = useAuth();
+  const { user, hasPermission, loading, role, isAdmin } = useAuth();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        navigate("/auth", { replace: true });
-      } else {
-        setIsAuthenticated(true);
-      }
-    });
+    if (!loading && !user) {
+      navigate("/auth", { replace: true });
+    }
+  }, [loading, user, navigate]);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) {
-        navigate("/auth", { replace: true });
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
-
-  if (isAuthenticated === null || loading) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
         Carregando...
@@ -40,7 +27,29 @@ export function ProtectedRoute({ children, requiredPermission }: ProtectedRouteP
     );
   }
 
-  if (!loading && isAuthenticated && requiredPermission && role && !hasPermission(requiredPermission)) {
+  if (!user) return null;
+
+  // Role gate (e.g. admin-only routes)
+  if (requiredRole && role?.name !== requiredRole) {
+    return (
+      <Layout>
+        <div className="flex flex-col items-center justify-center h-64 gap-4">
+          <div className="text-center space-y-2">
+            <h1 className="text-2xl font-bold text-gray-700">Acesso Restrito</h1>
+            <p className="text-muted-foreground">
+              Apenas administradores podem acessar este módulo.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Use o menu lateral para navegar aos módulos disponíveis.
+            </p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // Permission gate (e.g. dashboard, financeiro, etc.)
+  if (requiredPermission && role && !hasPermission(requiredPermission)) {
     return (
       <Layout>
         <div className="flex flex-col items-center justify-center h-64 gap-4">

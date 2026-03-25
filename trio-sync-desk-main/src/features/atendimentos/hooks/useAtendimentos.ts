@@ -1,28 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Atendimento, AtendimentoFormData } from "../types";
 import { useToast } from "@/hooks/use-toast";
-
-const STORAGE_KEY = "atendimentos_local_storage";
-
-// Função para obter atendimentos do localStorage
-const getAtendimentosFromStorage = (): Atendimento[] => {
-    try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        return stored ? JSON.parse(stored) : [];
-    } catch (error) {
-        console.error("Erro ao ler atendimentos do localStorage:", error);
-        return [];
-    }
-};
-
-// Função para salvar atendimentos no localStorage
-const saveAtendimentosToStorage = (atendimentos: Atendimento[]) => {
-    try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(atendimentos));
-    } catch (error) {
-        console.error("Erro ao salvar atendimentos no localStorage:", error);
-    }
-};
 
 export function useAtendimentos() {
     const { toast } = useToast();
@@ -31,36 +10,39 @@ export function useAtendimentos() {
     const { data: atendimentos, isLoading } = useQuery({
         queryKey: ["atendimentos"],
         queryFn: async () => {
-            // Simular delay de rede para melhor UX
-            await new Promise(resolve => setTimeout(resolve, 100));
-            return getAtendimentosFromStorage();
+            const { data, error } = await supabase
+                .from("atendimentos")
+                .select("*, solicitante:solicitado_por(nome)")
+                .order("created_at", { ascending: false });
+
+            if (error) throw error;
+
+            return (data || []).map((item: any) => ({
+                ...item,
+                solicitante_nome: item.solicitante?.nome || null,
+            })) as Atendimento[];
         },
     });
 
     const createMutation = useMutation({
         mutationFn: async (newAtendimento: AtendimentoFormData) => {
-            const currentAtendimentos = getAtendimentosFromStorage();
+            const { data: { user } } = await supabase.auth.getUser();
 
-            // Criar novo atendimento
-            const atendimento: Atendimento = {
-                id: crypto.randomUUID(),
-                cliente_id: newAtendimento.cliente_id, // Armazenar relação com cliente
-                cliente_nome: newAtendimento.cliente_nome,
-                cliente_contato: newAtendimento.cliente_contato,
-                tipo_solicitacao: newAtendimento.tipo_solicitacao,
-                descricao: newAtendimento.descricao,
-                status: "aguardando",
-                solicitado_por: {
-                    nome: "Usuário Local",
-                },
-                created_at: new Date().toISOString(),
-            };
+            const { data, error } = await supabase
+                .from("atendimentos")
+                .insert({
+                    cliente_nome: newAtendimento.cliente_nome,
+                    cliente_contato: newAtendimento.cliente_contato,
+                    tipo_solicitacao: newAtendimento.tipo_solicitacao,
+                    descricao: newAtendimento.descricao || null,
+                    status: "aguardando",
+                    solicitado_por: user?.id || null,
+                })
+                .select()
+                .single();
 
-            // Adicionar ao array e salvar
-            const updatedAtendimentos = [atendimento, ...currentAtendimentos];
-            saveAtendimentosToStorage(updatedAtendimentos);
-
-            return atendimento;
+            if (error) throw error;
+            return data;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["atendimentos"] });
@@ -78,22 +60,25 @@ export function useAtendimentos() {
 
     const atenderMutation = useMutation({
         mutationFn: async (atendimentoId: string) => {
-            const currentAtendimentos = getAtendimentosFromStorage();
-            const updatedAtendimentos = currentAtendimentos.map(atendimento =>
-                atendimento.id === atendimentoId
-                    ? {
-                        ...atendimento,
-                        status: "em_atendimento" as const,
-                        atendido_por: "local-user",
-                        atendido_at: new Date().toISOString(),
-                    }
-                    : atendimento
-            );
-            saveAtendimentosToStorage(updatedAtendimentos);
-            return updatedAtendimentos;
+            const { data: { user } } = await supabase.auth.getUser();
+
+            const { data, error } = await supabase
+                .from("atendimentos")
+                .update({
+                    status: "em_atendimento",
+                    atendido_por: user?.id || null,
+                    atendido_at: new Date().toISOString(),
+                })
+                .eq("id", atendimentoId)
+                .select()
+                .single();
+
+            if (error) throw error;
+            return data;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["atendimentos"] });
+            queryClient.invalidateQueries({ queryKey: ["atendimentos-pending"] });
             toast({ title: "Atendimento iniciado!" });
         },
         onError: (error: Error) => {
@@ -107,21 +92,39 @@ export function useAtendimentos() {
 
     const deleteMutation = useMutation({
         mutationFn: async (id: string) => {
-            const currentAtendimentos = getAtendimentosFromStorage();
-            const updatedAtendimentos = currentAtendimentos.filter(atendimento => atendimento.id !== id);
-            saveAtendimentosToStorage(updatedAtendimentos);
-            return updatedAtendimentos;
+            const { error } = await supabase
+                .from("atendimentos")
+                .delete()
+                .eq("id", id);
+
+            if (error) throw error;
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["atendimentos"] });
-            toast({ title: "Atendimento excluído com sucesso!" });
+        onMutate: async (id) => {
+            await queryClient.cancelQueries({ queryKey: ["atendimentos"] });
+            const previousAtendimentos = queryClient.getQueryData<Atendimento[]>(["atendimentos"]);
+
+            queryClient.setQueryData<Atendimento[]>(["atendimentos"], (old) =>
+                old ? old.filter((a) => a.id !== id) : []
+            );
+
+            return { previousAtendimentos };
         },
-        onError: (error: Error) => {
+        onError: (err, _id, context) => {
+            if (context?.previousAtendimentos) {
+                queryClient.setQueryData(["atendimentos"], context.previousAtendimentos);
+            }
             toast({
                 title: "Erro ao excluir atendimento",
-                description: error.message,
+                description: err.message,
                 variant: "destructive",
             });
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ["atendimentos"] });
+            queryClient.invalidateQueries({ queryKey: ["atendimentos-pending"] });
+        },
+        onSuccess: () => {
+            toast({ title: "Atendimento excluído com sucesso!" });
         },
     });
 
