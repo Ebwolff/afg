@@ -10,7 +10,7 @@ export function useDashboardData() {
         queryFn: async () => {
             const { data, error } = await supabase
                 .from("transacoes")
-                .select("id, tipo, valor, status, data_vencimento, data_pagamento, created_at");
+                .select("id, tipo, valor, status, data_vencimento, data_pagamento, data");
             if (error) handleSupabaseError(error, "Erro ao carregar transações");
             return data;
         },
