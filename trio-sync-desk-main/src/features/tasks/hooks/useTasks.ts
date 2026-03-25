@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Task, TaskFormData, TaskAttachment } from "../types";
+import { Task, TaskFormData, TaskAttachment, TaskComment } from "../types";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -44,13 +44,15 @@ async function sendTaskNotification(
     });
 }
 
-async function uploadTaskFiles(taskId: string, files: File[], phase: "creation" | "completion") {
+async function uploadTaskFiles(taskId: string, files: File[], phase: "creation" | "completion" | "progress", commentId?: string) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     for (const file of files) {
         const ext = file.name.split(".").pop() || "";
-        const filePath = `tasks/${taskId}/${phase}/${Date.now()}_${file.name}`;
+        const timestamp = Date.now();
+        const safeName = file.name.replace(/[^\w.-]/g, '');
+        const filePath = `tasks/${taskId}/${phase}/${timestamp}_${safeName}`;
 
         const { error: uploadError } = await supabase.storage
             .from("task-attachments")
@@ -69,6 +71,7 @@ async function uploadTaskFiles(taskId: string, files: File[], phase: "creation" 
             file_size: file.size,
             file_type: file.type || ext,
             phase,
+            comment_id: commentId || null,
         });
     }
 }
@@ -85,6 +88,29 @@ export function useTaskAttachments(taskId: string | undefined) {
                 .order("created_at", { ascending: true });
             if (error) throw error;
             return (data || []) as TaskAttachment[];
+        },
+        enabled: !!taskId,
+    });
+}
+
+export function useTaskComments(taskId: string | undefined) {
+    return useQuery({
+        queryKey: ["task-comments", taskId],
+        queryFn: async () => {
+            if (!taskId) return [];
+            const { data, error } = await supabase
+                .from("task_comments")
+                .select(`
+                    id, task_id, user_id, content, created_at,
+                    user:user_id(nome, email)
+                `)
+                .eq("task_id", taskId)
+                .order("created_at", { ascending: true });
+            if (error) throw error;
+            return (data || []).map((c: any) => ({
+                ...c,
+                user: Array.isArray(c.user) ? c.user[0] : c.user,
+            })) as TaskComment[];
         },
         enabled: !!taskId,
     });
@@ -222,6 +248,62 @@ export function useTasks() {
         },
     });
 
+    const createTaskComment = useMutation({
+        mutationFn: async ({ taskId, content, files }: { taskId: string; content: string; files?: File[] }) => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Usuário não autenticado");
+
+            // 1. Insert Comment
+            const { data: commentData, error: commentError } = await supabase
+                .from("task_comments")
+                .insert({
+                    task_id: taskId,
+                    user_id: user.id,
+                    content,
+                })
+                .select()
+                .single();
+
+            if (commentError) throw commentError;
+
+            // 2. Upload Files if any
+            if (files && files.length > 0) {
+                await uploadTaskFiles(taskId, files, "progress", commentData.id);
+            }
+
+            // 3. Obter a tarefa para enviar notificação
+            const { data: taskData } = await supabase
+                .from("tasks")
+                .select("title, assigned_to, created_by, priority")
+                .eq("id", taskId)
+                .single();
+
+            if (taskData) {
+                // Se o executor comentou, notifica o criador (se for diferente)
+                // Se o criador ou terceiros comentou, notifica o executor
+                const notifyUserId = user.id === taskData.assigned_to ? taskData.created_by : taskData.assigned_to;
+                if (notifyUserId && notifyUserId !== user.id) {
+                    await sendTaskNotification(
+                        notifyUserId,
+                        taskData.title,
+                        taskData.priority,
+                        "task_update"
+                    );
+                }
+            }
+
+            return commentData;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["task-comments"] });
+            queryClient.invalidateQueries({ queryKey: ["task-attachments"] });
+            toast.success("Andamento adicionado com sucesso.");
+        },
+        onError: () => {
+            toast.error("Erro ao adicionar o andamento.");
+        },
+    });
+
     return {
         tasks,
         isLoading,
@@ -229,5 +311,6 @@ export function useTasks() {
         createTask,
         updateTask,
         deleteTask,
+        createTaskComment,
     };
 }

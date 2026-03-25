@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { Task, TaskPriority, TaskStatus, TaskAttachment } from "../types";
 import { TaskFormDialog } from "./TaskFormDialog";
-import { useTaskAttachments } from "../hooks/useTasks";
+import { useTasks, useTaskComments, useTaskAttachments } from "../hooks/useTasks";
 import { supabase } from "@/integrations/supabase/client";
 
 interface TaskListProps {
@@ -103,7 +103,14 @@ export function TaskList({ tasks, isLoading, onDelete, onUpdate }: TaskListProps
     const [isSubmitting, setIsSubmitting] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    const { createTaskComment } = useTasks();
     const { data: viewAttachments } = useTaskAttachments(viewingTask?.id);
+    const { data: comments } = useTaskComments(viewingTask?.id);
+
+    const [newComment, setNewComment] = useState("");
+    const [commentFiles, setCommentFiles] = useState<File[]>([]);
+    const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+    const commentFileInputRef = useRef<HTMLInputElement>(null);
 
     const getStatusBadge = (status: TaskStatus) => {
         const cfg = STATUS_CONFIG[status];
@@ -143,6 +150,32 @@ export function TaskList({ tasks, isLoading, onDelete, onUpdate }: TaskListProps
 
     const removeCompletionFile = (index: number) => {
         setCompletionFiles((prev) => prev.filter((_, i) => i !== index));
+    };
+
+    const handleCommentFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newFiles = Array.from(e.target.files || []);
+        setCommentFiles((prev) => [...prev, ...newFiles]);
+        if (commentFileInputRef.current) commentFileInputRef.current.value = "";
+    };
+
+    const removeCommentFile = (index: number) => {
+        setCommentFiles((prev) => prev.filter((_, i) => i !== index));
+    };
+
+    const handleAddComment = async () => {
+        if (!viewingTask || (!newComment.trim() && commentFiles.length === 0)) return;
+        setIsSubmittingComment(true);
+        try {
+            await createTaskComment.mutateAsync({
+                taskId: viewingTask.id,
+                content: newComment,
+                files: commentFiles,
+            });
+            setNewComment("");
+            setCommentFiles([]);
+        } finally {
+            setIsSubmittingComment(false);
+        }
     };
 
     if (isLoading) {
@@ -324,23 +357,115 @@ export function TaskList({ tasks, isLoading, onDelete, onUpdate }: TaskListProps
                             {viewingTask.completion_notes && (
                                 <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/30 p-4">
                                     <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400 mb-1">
-                                        Notas de Conclusão
+                                        Notas de Conclusão Final
                                     </p>
                                     <p className="text-sm whitespace-pre-wrap">{viewingTask.completion_notes}</p>
                                 </div>
                             )}
 
-                            {/* Anexos */}
-                            {viewAttachments && viewAttachments.length > 0 && (
+                            {/* Timeline de Andamentos */}
+                            <div className="space-y-4 pt-4 border-t">
+                                <h4 className="text-sm font-medium">Histórico de Andamentos</h4>
+
+                                {comments && comments.length > 0 ? (
+                                    <div className="space-y-4">
+                                        {comments.map((comment) => {
+                                            const commentAtts = viewAttachments?.filter(a => a.comment_id === comment.id) || [];
+                                            return (
+                                                <div key={comment.id} className="bg-muted/30 rounded-lg p-3 text-sm">
+                                                    <div className="flex justify-between items-start mb-1">
+                                                        <span className="font-medium">{comment.user?.nome || "Usuário"}</span>
+                                                        <span className="text-xs text-muted-foreground">
+                                                            {format(new Date(comment.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                                                        </span>
+                                                    </div>
+                                                    <p className="whitespace-pre-wrap mt-1">{comment.content}</p>
+                                                    {commentAtts.length > 0 && (
+                                                        <div className="mt-2 space-y-1">
+                                                            {commentAtts.map(att => (
+                                                                <div key={att.id} className="flex items-center gap-2 text-xs bg-background border p-1.5 rounded">
+                                                                    <FileIcon className="h-3 w-3 text-muted-foreground shrink-0" />
+                                                                    <span className="truncate flex-1">{att.file_name}</span>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-5 w-5"
+                                                                        onClick={async () => {
+                                                                            const { data } = await supabase.storage.from("task-attachments").createSignedUrl(att.file_path, 300);
+                                                                            if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+                                                                        }}
+                                                                    >
+                                                                        <Download className="h-3 w-3" />
+                                                                    </Button>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-muted-foreground italic">Nenhum andamento registrado ainda.</p>
+                                )}
+
+                                {/* Área de novo comentário (apenas se a tarefa não estiver concluída/cancelada) */}
+                                {(viewingTask.status === "pending" || viewingTask.status === "in_progress") && (
+                                    <div className="mt-4 border rounded-lg p-3 bg-card">
+                                        <Label className="text-xs mb-2 block">Adicionar Novo Andamento</Label>
+                                        <Textarea
+                                            placeholder="Descreva o que foi feito..."
+                                            className="text-sm min-h-[80px] mb-2"
+                                            value={newComment}
+                                            onChange={(e) => setNewComment(e.target.value)}
+                                        />
+
+                                        {/* Lista de arquivos a enviar */}
+                                        {commentFiles.length > 0 && (
+                                            <div className="space-y-1 mb-2">
+                                                {commentFiles.map((f, idx) => (
+                                                    <div key={idx} className="flex items-center gap-2 text-xs bg-muted/50 p-1 rounded">
+                                                        <FileIcon className="h-3 w-3" />
+                                                        <span className="flex-1 truncate">{f.name}</span>
+                                                        <X className="h-3 w-3 cursor-pointer text-muted-foreground hover:text-red-500" onClick={() => removeCommentFile(idx)} />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <input
+                                                    type="file"
+                                                    ref={commentFileInputRef}
+                                                    className="hidden"
+                                                    multiple
+                                                    onChange={handleCommentFileChange}
+                                                />
+                                                <Button type="button" variant="outline" size="sm" onClick={() => commentFileInputRef.current?.click()}>
+                                                    <Paperclip className="h-3 w-3 mr-1" /> Anexar
+                                                </Button>
+                                            </div>
+                                            <Button size="sm" onClick={handleAddComment} disabled={isSubmittingComment || (!newComment.trim() && commentFiles.length === 0)}>
+                                                {isSubmittingComment && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                                                Salvar Andamento
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Outros Anexos Gerais (Creation & Completion) */}
+                            {viewAttachments && viewAttachments.filter(a => !a.comment_id).length > 0 && (
                                 <div className="space-y-3 border-t pt-4">
                                     <div className="flex items-center gap-2 mb-2">
                                         <Paperclip className="h-4 w-4 text-muted-foreground" />
                                         <span className="text-sm font-medium">
-                                            Anexos ({viewAttachments.length})
+                                            Outros Anexos ({viewAttachments.filter(a => !a.comment_id).length})
                                         </span>
                                     </div>
-                                    <AttachmentList attachments={viewAttachments} phase="creation" />
-                                    <AttachmentList attachments={viewAttachments} phase="completion" />
+                                    <AttachmentList attachments={viewAttachments.filter(a => !a.comment_id)} phase="creation" />
+                                    <AttachmentList attachments={viewAttachments.filter(a => !a.comment_id)} phase="completion" />
                                 </div>
                             )}
 

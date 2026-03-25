@@ -27,6 +27,7 @@ import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { Task, TaskFormData, TaskPriority, TaskStatus } from "../types";
 import { useProfiles } from "../hooks/useProfiles";
+import { useClientes } from "@/features/clientes/hooks/useClientes";
 
 interface TaskFormDialogProps {
     open?: boolean;
@@ -50,6 +51,7 @@ export function TaskFormDialog({
 
     const [isLoading, setIsLoading] = useState(false);
     const { data: profiles } = useProfiles();
+    const { clientes } = useClientes();
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [formData, setFormData] = useState<TaskFormData>({
@@ -222,6 +224,32 @@ export function TaskFormDialog({
                                     {profiles?.map((profile) => (
                                         <SelectItem key={profile.id} value={profile.id}>
                                             {profile.nome}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="grid gap-2">
+                            <Label htmlFor="cliente">Vincular a Cliente (Opcional)</Label>
+                            <Select
+                                value={formData.related_entity_type === 'cliente' ? formData.related_entity_id : "none"}
+                                onValueChange={(value) =>
+                                    setFormData({ 
+                                        ...formData, 
+                                        related_entity_type: value === "none" ? undefined : "cliente",
+                                        related_entity_id: value === "none" ? undefined : value
+                                    })
+                                }
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Selecione um cliente" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">Nenhum</SelectItem>
+                                    {clientes?.map((cliente) => (
+                                        <SelectItem key={cliente.id} value={cliente.id}>
+                                            {cliente.nome}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>

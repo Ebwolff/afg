@@ -1,7 +1,7 @@
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 export type TaskPriority = 'low' | 'medium' | 'high';
 export type RelatedEntityType = 'atendimento' | 'cliente' | 'transacao' | 'servico';
-export type AttachmentPhase = 'creation' | 'completion';
+export type AttachmentPhase = 'creation' | 'completion' | 'progress';
 
 export interface TaskAttachment {
     id: string;
@@ -12,6 +12,7 @@ export interface TaskAttachment {
     file_size: number;
     file_type: string | null;
     phase: AttachmentPhase;
+    comment_id: string | null;
     created_at: string;
 }
 
@@ -36,6 +37,21 @@ export interface Task {
         email: string;
     };
     creator?: {
+        nome: string;
+        email: string;
+    };
+    // Loaded separately
+    attachments?: TaskAttachment[];
+}
+
+export interface TaskComment {
+    id: string;
+    task_id: string;
+    user_id: string | null;
+    content: string;
+    created_at: string;
+    // Joined fields
+    user?: {
         nome: string;
         email: string;
     };
