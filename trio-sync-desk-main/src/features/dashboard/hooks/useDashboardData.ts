@@ -8,11 +8,9 @@ export function useDashboardData() {
     const { data: transacoes, isLoading: loadingTransacoes } = useQuery({
         queryKey: ["transacoes-summary"],
         queryFn: async () => {
-            const sixMonthsAgo = subMonths(new Date(), 6).toISOString();
             const { data, error } = await supabase
                 .from("transacoes")
-                .select("id, tipo, valor, status, data_vencimento, data_pagamento, created_at")
-                .gte("created_at", sixMonthsAgo);
+                .select("id, tipo, valor, status, data_vencimento, data_pagamento, created_at");
             if (error) handleSupabaseError(error, "Erro ao carregar transações");
             return data;
         },
