@@ -70,16 +70,37 @@ export default function Administracao() {
         .from("user_roles")
         .select("user_id, role_id, role, custom_role:role_id(id, name, display_name, permissions)");
 
+      // Buscar todas as custom_roles para fallback (quando role_id é NULL)
+      const { data: allRoles } = await supabase
+        .from("custom_roles")
+        .select("id, name, display_name, permissions");
+
+      const allRolesMap = new Map<string, { id: string; name: string; display_name: string; permissions: string[] }>();
+      allRoles?.forEach((r) => allRolesMap.set(r.name, r));
+
       const rolesMap = new Map<string, { role_id: string | null; role_name: string; role_display_name: string; role_permissions: string[] }>();
 
       roles?.forEach((r) => {
         const cr = r.custom_role && !Array.isArray(r.custom_role) ? r.custom_role : null;
-        rolesMap.set(r.user_id, {
-          role_id: cr?.id || null,
-          role_name: cr?.name || r.role || "servicos",
-          role_display_name: cr?.display_name || (r.role === "admin" ? "Administrador" : "Serviços"),
-          role_permissions: (cr?.permissions as string[]) || [],
-        });
+
+        if (cr) {
+          // Novo sistema: role_id populado, JOIN funcionou
+          rolesMap.set(r.user_id, {
+            role_id: cr.id,
+            role_name: cr.name,
+            role_display_name: cr.display_name,
+            role_permissions: (cr.permissions as string[]) || [],
+          });
+        } else {
+          // Fallback: role_id é NULL, buscar pela string 'role'
+          const fallback = r.role ? allRolesMap.get(r.role) : null;
+          rolesMap.set(r.user_id, {
+            role_id: fallback?.id || null,
+            role_name: fallback?.name || r.role || "servicos",
+            role_display_name: fallback?.display_name || (r.role === "admin" ? "Administrador" : "Serviços"),
+            role_permissions: (fallback?.permissions as string[]) || [],
+          });
+        }
       });
 
       return (profiles || []).map((p) => ({
