@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -228,6 +228,7 @@ export default function Administracao() {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Cadastrar Novo Usuário</DialogTitle>
+                <DialogDescription>Preencha os dados para criar um novo usuário no sistema.</DialogDescription>
               </DialogHeader>
               <form
                 onSubmit={(e) => {
@@ -376,6 +377,7 @@ export default function Administracao() {
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Permissões — {selectedUser?.nome}</DialogTitle>
+              <DialogDescription>Configure o perfil e os módulos de acesso do usuário.</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
@@ -467,10 +469,7 @@ export default function Administracao() {
                 onClick={async () => {
                   if (selectedUser && selectedRoleId) {
                     try {
-                      // 1. Atualizar role do usuário
-                      await updateUserRole.mutateAsync({ userId: selectedUser.id, roleId: selectedRoleId });
-
-                      // 2. Atualizar permissões da role (com verificação)
+                      // 1. Atualizar permissões da role PRIMEIRO (evita race condition com onSuccess do updateUserRole)
                       const { data: updated, error } = await supabase
                         .from("custom_roles")
                         .update({ permissions: selectedPermissions })
@@ -481,13 +480,26 @@ export default function Administracao() {
                       if (error) throw error;
                       if (!updated) throw new Error("Não foi possível atualizar as permissões. Verifique se você tem permissão de administrador.");
 
-                      // Atualizar o cache otimistamente para refletir na tabela imediatamente
+                      // Verificar se as permissões foram realmente salvas
+                      const savedPerms = (updated.permissions as string[]) || [];
+                      if (savedPerms.length !== selectedPermissions.length) {
+                        throw new Error("As permissões não foram salvas corretamente. Tente novamente.");
+                      }
+
+                      // 2. Atualizar role do usuário (onSuccess dispara invalidateQueries, mas custom_roles já está atualizado)
+                      await updateUserRole.mutateAsync({ userId: selectedUser.id, roleId: selectedRoleId });
+
+                      // Atualizar o cache otimistamente para TODOS os usuários com essa role
                       queryClient.setQueryData<UserProfile[]>(["admin-users"], (old) =>
-                        old?.map((u) =>
-                          u.id === selectedUser.id
-                            ? { ...u, role_permissions: selectedPermissions, role_id: selectedRoleId }
-                            : u
-                        )
+                        old?.map((u) => {
+                          if (u.id === selectedUser.id) {
+                            return { ...u, role_permissions: selectedPermissions, role_id: selectedRoleId };
+                          }
+                          if (u.role_id === selectedRoleId) {
+                            return { ...u, role_permissions: selectedPermissions };
+                          }
+                          return u;
+                        })
                       );
 
                       toast({ title: "Permissões atualizadas!", description: `${selectedPermissions.length} módulo(s) configurado(s).` });
@@ -495,8 +507,8 @@ export default function Administracao() {
                       setSelectedUser(null);
 
                       // Refetch para consistência com o servidor
-                      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
-                      queryClient.invalidateQueries({ queryKey: ["custom-roles"] });
+                      await queryClient.invalidateQueries({ queryKey: ["custom-roles"] });
+                      await queryClient.invalidateQueries({ queryKey: ["admin-users"] });
                     } catch (err: unknown) {
                       const error = err as Error;
                       toast({ title: "Erro ao atualizar", description: error.message, variant: "destructive" });
@@ -517,6 +529,7 @@ export default function Administracao() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Editar Usuário</DialogTitle>
+              <DialogDescription>Altere o nome ou perfil do usuário.</DialogDescription>
             </DialogHeader>
             {editUser && (
               <form
@@ -566,6 +579,7 @@ export default function Administracao() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Confirmar Exclusão</DialogTitle>
+              <DialogDescription>Esta ação é irreversível. O usuário será removido permanentemente.</DialogDescription>
             </DialogHeader>
             <p className="text-sm text-muted-foreground">
               Tem certeza que deseja remover este usuário? Esta ação não pode ser desfeita.

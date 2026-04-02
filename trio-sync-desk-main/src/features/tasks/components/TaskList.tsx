@@ -17,7 +17,7 @@ import {
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
-    Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+    Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import {
     MoreHorizontal, Pencil, Trash2, CheckCircle2, CalendarDays, User,
@@ -305,6 +305,7 @@ export function TaskList({ tasks, isLoading, onDelete, onUpdate }: TaskListProps
                 <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle className="text-xl">{viewingTask?.title}</DialogTitle>
+                        <DialogDescription>Detalhes, andamentos e anexos da tarefa.</DialogDescription>
                     </DialogHeader>
                     {viewingTask && (
                         <div className="space-y-5">
@@ -517,6 +518,7 @@ export function TaskList({ tasks, isLoading, onDelete, onUpdate }: TaskListProps
                             <CheckCircle2 className="h-5 w-5 text-emerald-500" />
                             Concluir Tarefa
                         </DialogTitle>
+                        <DialogDescription>Adicione notas e anexos de conclusão antes de finalizar.</DialogDescription>
                     </DialogHeader>
                     {completingTask && (
                         <div className="space-y-4">

@@ -5,6 +5,7 @@ import * as z from "zod";
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogHeader,
     DialogTitle,
     DialogTrigger,
@@ -73,6 +74,7 @@ export const CreateLeadDialog: React.FC = () => {
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
                     <DialogTitle>Cadastrar Novo Lead</DialogTitle>
+                    <DialogDescription>Insira os dados do novo lead para acompanhamento.</DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
