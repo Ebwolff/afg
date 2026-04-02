@@ -469,25 +469,23 @@ export default function Administracao() {
                 onClick={async () => {
                   if (selectedUser && selectedRoleId) {
                     try {
-                      // 1. Atualizar permissões da role PRIMEIRO (evita race condition com onSuccess do updateUserRole)
-                      const { data: updated, error } = await supabase
-                        .from("custom_roles")
-                        .update({ permissions: selectedPermissions })
-                        .eq("id", selectedRoleId)
-                        .select("id, permissions")
-                        .single();
+                      // Usar Edge Function com service_role para bypassa RLS
+                      const { data, error } = await supabase.functions.invoke("admin-update-permissions", {
+                        body: {
+                          roleId: selectedRoleId,
+                          permissions: selectedPermissions,
+                          userId: selectedUser.id,
+                        },
+                      });
 
                       if (error) throw error;
-                      if (!updated) throw new Error("Não foi possível atualizar as permissões. Verifique se você tem permissão de administrador.");
+                      if (data?.error) throw new Error(data.error);
 
-                      // Verificar se as permissões foram realmente salvas
-                      const savedPerms = (updated.permissions as string[]) || [];
+                      // Verificar se as permissões foram salvas
+                      const savedPerms = (data?.savedPermissions as string[]) || [];
                       if (savedPerms.length !== selectedPermissions.length) {
                         throw new Error("As permissões não foram salvas corretamente. Tente novamente.");
                       }
-
-                      // 2. Atualizar role do usuário (onSuccess dispara invalidateQueries, mas custom_roles já está atualizado)
-                      await updateUserRole.mutateAsync({ userId: selectedUser.id, roleId: selectedRoleId });
 
                       // Atualizar o cache otimistamente para TODOS os usuários com essa role
                       queryClient.setQueryData<UserProfile[]>(["admin-users"], (old) =>

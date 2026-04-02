@@ -1,0 +1,114 @@
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Não autorizado" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const adminClient = createClient(supabaseUrl, serviceRoleKey);
+
+    // Verificar identidade do chamador
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user: caller }, error: authError } = await adminClient.auth.getUser(token);
+
+    if (authError || !caller) {
+      return new Response(JSON.stringify({ error: "Token inválido" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Verificar se o chamador é admin
+    const { data: callerRole } = await adminClient
+      .from("user_roles")
+      .select("role, role_id, custom_role:role_id(name)")
+      .eq("user_id", caller.id)
+      .single();
+
+    const callerRoleName = callerRole?.custom_role?.name || callerRole?.role;
+    if (callerRoleName !== "admin") {
+      return new Response(JSON.stringify({ error: "Acesso restrito a administradores" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const body = await req.json();
+    const { roleId, permissions, userId } = body;
+
+    if (!roleId || !Array.isArray(permissions)) {
+      return new Response(JSON.stringify({ error: "roleId e permissions são obrigatórios" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // 1. Atualizar permissões da role (via service_role, bypassa RLS)
+    const { data: updatedRole, error: updateError } = await adminClient
+      .from("custom_roles")
+      .update({ permissions })
+      .eq("id", roleId)
+      .select("id, name, permissions")
+      .single();
+
+    if (updateError) {
+      return new Response(JSON.stringify({ error: `Erro ao atualizar role: ${updateError.message}` }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!updatedRole) {
+      return new Response(JSON.stringify({ error: "Role não encontrada" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // 2. Se userId fornecido, atualizar também o role_id do usuário
+    if (userId) {
+      const { error: userRoleError } = await adminClient
+        .from("user_roles")
+        .update({ role_id: roleId, role: updatedRole.name })
+        .eq("user_id", userId);
+
+      if (userRoleError) {
+        return new Response(JSON.stringify({ error: `Erro ao atualizar user_role: ${userRoleError.message}` }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    return new Response(JSON.stringify({
+      success: true,
+      role: updatedRole,
+      savedPermissions: updatedRole.permissions,
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: String(err?.message || err) }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});
