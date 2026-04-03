@@ -82,25 +82,57 @@ serve(async (req) => {
       });
     }
 
-    // 2. Se userId fornecido, atualizar também o role_id do usuário
+    // 2. Se userId fornecido, garantir que user_roles tenha o role_id correto (UPSERT)
     if (userId) {
-      const { error: userRoleError } = await adminClient
+      // Tentar update primeiro
+      const { data: existingRole } = await adminClient
         .from("user_roles")
-        .update({ role_id: roleId, role: updatedRole.name })
-        .eq("user_id", userId);
+        .select("user_id")
+        .eq("user_id", userId)
+        .single();
 
-      if (userRoleError) {
-        return new Response(JSON.stringify({ error: `Erro ao atualizar user_role: ${userRoleError.message}` }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+      if (existingRole) {
+        // Row existe, fazer update
+        const { error: userRoleError } = await adminClient
+          .from("user_roles")
+          .update({ role_id: roleId, role: updatedRole.name })
+          .eq("user_id", userId);
+
+        if (userRoleError) {
+          return new Response(JSON.stringify({ error: `Erro ao atualizar user_role: ${userRoleError.message}` }), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } else {
+        // Row não existe, inserir
+        const { error: insertError } = await adminClient
+          .from("user_roles")
+          .insert({ user_id: userId, role_id: roleId, role: updatedRole.name });
+
+        if (insertError) {
+          return new Response(JSON.stringify({ error: `Erro ao inserir user_role: ${insertError.message}` }), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
       }
     }
+
+    // 3. Verificar se a permissão realmente persistiu (re-read)
+    const { data: verifyRole } = await adminClient
+      .from("custom_roles")
+      .select("id, name, permissions")
+      .eq("id", roleId)
+      .single();
+
+    const finalPermissions = (verifyRole?.permissions as string[]) || [];
 
     return new Response(JSON.stringify({
       success: true,
       role: updatedRole,
-      savedPermissions: updatedRole.permissions,
+      savedPermissions: finalPermissions,
+      verified: finalPermissions.length === permissions.length,
     }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -502,11 +502,15 @@ export default function Administracao() {
                       if (error) throw error;
                       if (data?.error) throw new Error(data.error);
 
-                      // Verificar se as permissões foram salvas
+                      // Verificar se as permissões foram REALMENTE salvas (Edge Function faz re-read)
                       const savedPerms = (data?.savedPermissions as string[]) || [];
-                      if (savedPerms.length !== selectedPermissions.length) {
-                        throw new Error("As permissões não foram salvas corretamente. Tente novamente.");
+                      if (!data?.verified || savedPerms.length !== selectedPermissions.length) {
+                        throw new Error(`Permissões não persistiram no banco. Esperado: ${selectedPermissions.length}, Salvo: ${savedPerms.length}. Verifique o Supabase Dashboard.`);
                       }
+
+                      // Cancelar qualquer refetch em andamento para não sobrescrever o update otimista
+                      await queryClient.cancelQueries({ queryKey: ["admin-users"] });
+                      await queryClient.cancelQueries({ queryKey: ["custom-roles"] });
 
                       // Atualizar o cache otimistamente para TODOS os usuários com essa role
                       queryClient.setQueryData<UserProfile[]>(["admin-users"], (old) =>
@@ -525,9 +529,11 @@ export default function Administracao() {
                       setPermDialogOpen(false);
                       setSelectedUser(null);
 
-                      // Refetch para consistência com o servidor
-                      await queryClient.invalidateQueries({ queryKey: ["custom-roles"] });
-                      await queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+                      // Refetch com delay para dar tempo ao DB de persistir
+                      setTimeout(() => {
+                        queryClient.invalidateQueries({ queryKey: ["custom-roles"] });
+                        queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+                      }, 2000);
                     } catch (err: unknown) {
                       const error = err as Error;
                       toast({ title: "Erro ao atualizar", description: error.message, variant: "destructive" });
