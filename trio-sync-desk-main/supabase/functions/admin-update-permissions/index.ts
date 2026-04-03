@@ -82,40 +82,18 @@ serve(async (req) => {
       });
     }
 
-    // 2. Se userId fornecido, garantir que user_roles tenha o role_id correto (UPSERT)
+    // 2. Se userId fornecido, atualizar role_id do usuário
     if (userId) {
-      // Tentar update primeiro
-      const { data: existingRole } = await adminClient
+      const { error: userRoleError } = await adminClient
         .from("user_roles")
-        .select("user_id")
-        .eq("user_id", userId)
-        .single();
+        .update({ role_id: roleId, role: updatedRole.name })
+        .eq("user_id", userId);
 
-      if (existingRole) {
-        // Row existe, fazer update
-        const { error: userRoleError } = await adminClient
-          .from("user_roles")
-          .update({ role_id: roleId, role: updatedRole.name })
-          .eq("user_id", userId);
-
-        if (userRoleError) {
-          return new Response(JSON.stringify({ error: `Erro ao atualizar user_role: ${userRoleError.message}` }), {
-            status: 200,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-      } else {
-        // Row não existe, inserir
-        const { error: insertError } = await adminClient
-          .from("user_roles")
-          .insert({ user_id: userId, role_id: roleId, role: updatedRole.name });
-
-        if (insertError) {
-          return new Response(JSON.stringify({ error: `Erro ao inserir user_role: ${insertError.message}` }), {
-            status: 200,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
+      if (userRoleError) {
+        return new Response(JSON.stringify({ error: `Erro ao atualizar user_role: ${userRoleError.message}` }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
     }
 
